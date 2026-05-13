@@ -1,0 +1,57 @@
+:root {
+  /* Red Hat brand colors */
+  --rh-red:          #ee0000;
+  --rh-red-dark:     #be0000;
+  --rh-black:        #000000;
+  --rh-white:        #ffffff;
+  --rh-gray-95:      #151515;
+  --rh-gray-80:      #292929;
+  --rh-gray-70:      #383838;
+  --rh-gray-60:      #4d4d4d;
+  --rh-gray-40:      #a3a3a3;
+  --rh-gray-20:      #e0e0e0;
+  --rh-gray-10:      #f2f2f2;
+
+  /* Typography — these are set as CSS variables by next/font in layout.tsx */
+  /* Fallbacks here are for non-Next.js contexts only */
+
+  /* Override PatternFly primary color tokens with Red Hat red */
+  --pf-v5-global--primary-color--100:       #ee0000;
+  --pf-v5-global--primary-color--200:       #be0000;
+  --pf-v5-global--primary-color--300:       #a30000;
+  --pf-v5-global--link--Color:              #ee0000;
+  --pf-v5-global--link--Color--hover:       #be0000;
+  --pf-v5-global--active-color--100:        #ee0000;
+  --pf-v5-global--Color--light-100:         #ffffff;
+
+  /* Masthead: Red Hat brand uses black header bar */
+  --pf-v5-c-masthead--BackgroundColor:      #000000;
+
+  /* Nav active indicator */
+  --pf-v5-c-nav__link--m-current--Color:                       #ffffff;
+  --pf-v5-c-nav__link--m-current--after--BackgroundColor:      #ee0000;
+  --pf-v5-c-nav__item--m-current__link--after--BackgroundColor: #ee0000;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  background-color: var(--rh-gray-10);
+  color: var(--rh-gray-95);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+code, pre, .pf-v5-u-font-family-mono {
+  font-family: var(--font-mono) !important;
+}
+
+/* Button overrides: primary buttons use Red Hat red */
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: #ee0000;
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: #be0000;
+  --pf-v5-c-button--m-primary--active--BackgroundColor: #a30000;
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: #be0000;
+}
