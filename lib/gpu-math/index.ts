@@ -10,3 +10,6 @@
 export * from "./memory";
 export * from "./throughput";
 export * from "./cost";
+export * from "./models";
+export * from "./gpus";
+export * from "./quick-estimate";

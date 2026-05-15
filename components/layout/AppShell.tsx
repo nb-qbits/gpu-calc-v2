@@ -80,7 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <Page
-      masthead={masthead}
+      header={masthead}
       sidebar={sidebar}
       skipToContent={
         <SkipToContent href="#main-content">Skip to content</SkipToContent>

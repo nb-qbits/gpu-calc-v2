@@ -1,4 +1,14 @@
 :root {
+  /* Point PatternFly's font-family tokens at the Next.js-loaded font variables.
+     Without this, PF resolves to "RedHatText"/"RedHatDisplay" which aren't
+     registered under those names and falls back to helvetica. */
+  --pf-v5-global--FontFamily--heading--vf: var(--font-display);
+  --pf-v5-global--FontFamily--text--vf:    var(--font-body);
+  --pf-v5-global--FontFamily--monospace--vf: var(--font-mono);
+  --pf-v5-global--FontFamily--heading:     var(--font-display);
+  --pf-v5-global--FontFamily--text:        var(--font-body);
+  --pf-v5-global--FontFamily--monospace:   var(--font-mono);
+
   /* Red Hat brand colors */
   --rh-red:          #ee0000;
   --rh-red-dark:     #be0000;
@@ -46,6 +56,17 @@ h1, h2, h3, h4, h5, h6 {
 
 code, pre, .pf-v5-u-font-family-mono {
   font-family: var(--font-mono) !important;
+}
+
+/* Selectable card: use a light red tint so selected state is visible on gray page background */
+.pf-v5-c-card.pf-m-selectable.pf-m-selected {
+  --pf-v5-c-card--BackgroundColor: #fff5f5;
+}
+
+/* Narrow centered layout for form-style pages */
+.rh-content-narrow {
+  max-width: 900px;
+  margin-inline: auto;
 }
 
 /* Button overrides: primary buttons use Red Hat red */
