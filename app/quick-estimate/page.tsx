@@ -210,26 +210,21 @@ function InputView({ state, setState }: {
                 {filteredModels.map((model) => {
                   const selected = model.id === state.selectedModelId;
                   return (
-                    <GridItem span={4} key={model.id}>
+                    <GridItem span={3} key={model.id}>
                       <Card
                         isSelectable
                         isSelected={selected}
+                        isCompact
                         onClick={() => setState((s) => ({ ...s, selectedModelId: model.id }))}
                       >
                         <CardBody>
-                          <Stack>
-                            <StackItem>
-                              <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold">
-                                {model.name}
-                              </Text>
-                            </StackItem>
-                            <StackItem>
-                              <Text component={TextVariants.small} className="pf-v5-u-color-200">
-                                {model.paramsBillions}B · {model.vendor}
-                                {model.activeFraction < 1 ? " · MoE" : ""}
-                              </Text>
-                            </StackItem>
-                          </Stack>
+                          <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold">
+                            {model.name}
+                          </Text>
+                          <Text component={TextVariants.small} className="pf-v5-u-color-200">
+                            {model.paramsBillions}B · {model.vendor}
+                            {model.activeFraction < 1 ? " · MoE" : ""}
+                          </Text>
                         </CardBody>
                       </Card>
                     </GridItem>

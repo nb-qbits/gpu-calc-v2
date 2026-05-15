@@ -12,7 +12,7 @@ export default function RoutingPage() {
       </PageSection>
       <PageSection>
         <EmptyState>
-          <CubesIcon size="xl" />
+          <CubesIcon />
           <Title headingLevel="h2" size="lg">Coming soon</Title>
           <EmptyStateBody>
             This tool is being ported from the original gpu-calc static site.
