@@ -173,7 +173,9 @@ function InputView({ state, setState }: {
         {/* title */}
         <StackItem>
           <TextContent className="pf-v5-u-text-align-center">
-            <Title headingLevel="h1" size="2xl">Configure your LLM deployment</Title>
+            <Title headingLevel="h1" size="3xl" className="pf-v5-u-font-weight-bold">
+              Configure your LLM deployment
+            </Title>
             <Text component={TextVariants.p} className="pf-v5-u-color-200">
               We&apos;ll estimate GPU requirements based on your key parameters
             </Text>
@@ -210,7 +212,7 @@ function InputView({ state, setState }: {
                 {filteredModels.map((model) => {
                   const selected = model.id === state.selectedModelId;
                   return (
-                    <GridItem span={3} key={model.id}>
+                    <GridItem span={6} md={4} lg={3} key={model.id}>
                       <Card
                         isSelectable
                         isSelected={selected}
@@ -574,24 +576,24 @@ function ResultsView({ state, setState }: {
 
       <Grid hasGutter>
         {/* ── main content ── */}
-        <GridItem span={state.controlsVisible ? 8 : 12}>
+        <GridItem span={12} lg={state.controlsVisible ? 8 : 12}>
           <Stack hasGutter>
             {/* summary cards */}
             <StackItem>
               <Grid hasGutter>
-                <GridItem span={3}>
+                <GridItem span={6} lg={3}>
                   <SummaryCard icon={<ServerIcon />} title="Replicas needed"
                     value={`${result.replicasNeeded}+`} sub={`${result.gpusPerReplica} × GPU`} isDanger />
                 </GridItem>
-                <GridItem span={3}>
+                <GridItem span={6} lg={3}>
                   <SummaryCard icon={<MicrochipIcon />} title="GPU availability"
                     value={`${result.cloudAvailabilityPct}%`} sub={`TPU availability: ${result.tpuAvailabilityPct}%`} />
                 </GridItem>
-                <GridItem span={3}>
+                <GridItem span={6} lg={3}>
                   <SummaryCard icon={<DollarSignIcon />} title="Server costs"
                     value={fmtMoney(result.costPerMonth)} sub={`/mo ${deployLabel}`} />
                 </GridItem>
-                <GridItem span={3}>
+                <GridItem span={6} lg={3}>
                   <SummaryCard icon={<TrendUpIcon />} title="Idle server costs"
                     value={fmtMoney(result.idleServerCostsPerMonth)} sub="30-min+ idle" />
                 </GridItem>
@@ -813,7 +815,7 @@ function ResultsView({ state, setState }: {
                 title="Cost" subtitle="Detailed cost breakdown"
                 expanded={state.expandedSections.cost} onToggle={toggleSection}>
                 <Grid hasGutter>
-                  <GridItem span={6}>
+                  <GridItem span={12} md={6}>
                     <Card isFlat>
                       <CardTitle>GPU costs</CardTitle>
                       <CardBody>
@@ -834,7 +836,7 @@ function ResultsView({ state, setState }: {
                       </CardBody>
                     </Card>
                   </GridItem>
-                  <GridItem span={6}>
+                  <GridItem span={12} md={6}>
                     <Card isFlat>
                       <CardTitle>On-prem estimate</CardTitle>
                       <CardBody>
@@ -888,7 +890,7 @@ function ResultsView({ state, setState }: {
 
         {/* ── quick adjustments sidebar ── */}
         {state.controlsVisible && (
-          <GridItem span={4}>
+          <GridItem span={12} lg={4}>
             <Card isFlat style={{ position: "sticky", top: "1rem" }}>
               <CardTitle>
                 <Stack>

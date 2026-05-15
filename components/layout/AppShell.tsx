@@ -1,38 +1,43 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   Page,
   Masthead,
   MastheadMain,
   MastheadBrand,
-  MastheadContent,
+  MastheadToggle,
   Nav,
   NavList,
   NavItem,
   PageSidebar,
   PageSidebarBody,
   SkipToContent,
-  Brand,
+  Button,
 } from "@patternfly/react-core";
+import { BarsIcon } from "@patternfly/react-icons";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Home",               href: "/" },
-  { label: "Quick Estimate",     href: "/quick-estimate" },
-  { label: "Advanced Calculator",href: "/calculator" },
-  { label: "GPU Explorer",       href: "/gpu-explorer" },
-  { label: "Hybrid Savings",     href: "/hybrid-savings" },
-  { label: "Routing Economics",  href: "/routing" },
+  { label: "Home",                href: "/" },
+  { label: "Quick Estimate",      href: "/quick-estimate" },
+  { label: "Advanced Calculator", href: "/calculator" },
+  { label: "GPU Explorer",        href: "/gpu-explorer" },
+  { label: "Hybrid Savings",      href: "/hybrid-savings" },
+  { label: "Routing Economics",   href: "/routing" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   const masthead = (
     <Masthead>
+      <MastheadToggle>
+        <Button variant="plain" aria-label="Global navigation">
+          <BarsIcon />
+        </Button>
+      </MastheadToggle>
       <MastheadMain>
         <MastheadBrand>
           <Link href="/" style={{ textDecoration: "none", color: "inherit" }}>
@@ -49,12 +54,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </MastheadBrand>
       </MastheadMain>
-      <MastheadContent />
     </Masthead>
   );
 
   const sidebar = (
-    <PageSidebar isSidebarOpen={isSidebarOpen}>
+    <PageSidebar>
       <PageSidebarBody>
         <Nav aria-label="Global navigation">
           <NavList>
@@ -82,6 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <Page
       header={masthead}
       sidebar={sidebar}
+      isManagedSidebar
       skipToContent={
         <SkipToContent href="#main-content">Skip to content</SkipToContent>
       }

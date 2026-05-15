@@ -9,6 +9,8 @@ import "@patternfly/react-styles/css/layouts/Split/split.css";
 import "@patternfly/react-styles/css/layouts/Gallery/gallery.css";
 import "@patternfly/react-styles/css/layouts/Bullseye/bullseye.css";
 // Components used across the app
+import "@patternfly/react-styles/css/components/Button/button.css";
+import "@patternfly/react-styles/css/components/Nav/nav.css";
 import "@patternfly/react-styles/css/components/Card/card.css";
 import "@patternfly/react-styles/css/components/Alert/alert.css";
 import "@patternfly/react-styles/css/components/ExpandableSection/expandable-section.css";
