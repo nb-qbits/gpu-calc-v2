@@ -495,6 +495,33 @@ function ResultSection({
   );
 }
 
+// ─── FlipCard ─────────────────────────────────────────────────────────────────
+
+function FlipCard({ front, back, height = 230 }: {
+  front: React.ReactNode;
+  back: React.ReactNode;
+  height?: number;
+}) {
+  const [flipped, setFlipped] = useState(false);
+  const toggle = () => setFlipped((f) => !f);
+  return (
+    <div
+      className={`rh-flip-card${flipped ? " rh-flip-card--flipped" : ""}`}
+      style={{ height }}
+      onClick={toggle}
+      role="button"
+      tabIndex={0}
+      aria-pressed={flipped}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } }}
+    >
+      <div className="rh-flip-card__inner">
+        <div className="rh-flip-card__face rh-flip-card__face--front">{front}</div>
+        <div className="rh-flip-card__face rh-flip-card__face--back">{back}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── ResultsView ──────────────────────────────────────────────────────────────
 
 function ResultsView({ state, setState }: {
@@ -600,89 +627,131 @@ function ResultsView({ state, setState }: {
               </Grid>
             </StackItem>
 
-            {/* Model weights */}
+            {/* Model weights — flip card */}
             <StackItem>
-              <ResultSection id="modelWeights" icon={<ServerIcon />}
-                title="Model weights" subtitle="How much memory each user needs"
-                expanded={state.expandedSections.modelWeights} onToggle={toggleSection}>
-                <DescriptionList columnModifier={{ default: "3Col" }} className="pf-v5-u-mb-md">
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Memory string</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">{selectedModel.paramsBillions}B params</span>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>{PRECISION_BYTES[precision].label} ({bytesPerWeight} bytes)</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">{fmtGb(result.weightsGb)}</span>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Active params</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">
-                        {(selectedModel.paramsBillions * selectedModel.activeFraction).toFixed(1)}B
-                        ({(selectedModel.activeFraction * 100).toFixed(0)}%)
-                      </span>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                </DescriptionList>
-                <Alert variant="custom" isInline isPlain title={
-                  `${selectedModel.paramsBillions}B params × ${bytesPerWeight} bytes (${PRECISION_BYTES[precision].label}) = ${fmtGb(result.weightsGb)}`
-                }>
-                  <Text component={TextVariants.small} className="pf-v5-u-font-family-mono">
-                    Calculation: {selectedModel.paramsBillions}B × {bytesPerWeight} bytes = {fmtGb(result.weightsGb)}
-                  </Text>
-                </Alert>
-              </ResultSection>
+              <FlipCard height={210}
+                front={
+                  <>
+                    <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsSm" }}>
+                      <FlexItem><span className="pf-v5-u-primary-color-100"><ServerIcon /></span></FlexItem>
+                      <FlexItem>
+                        <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold" style={{ display: "inline" }}>Model weights</Text>
+                        <Text component={TextVariants.small} className="pf-v5-u-color-200 pf-v5-u-ml-sm" style={{ display: "inline" }}>How much memory each user needs</Text>
+                      </FlexItem>
+                    </Flex>
+                    <DescriptionList columnModifier={{ default: "3Col" }}>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Memory string</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">{selectedModel.paramsBillions}B params</span>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>{PRECISION_BYTES[precision].label} ({bytesPerWeight} bytes)</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">{fmtGb(result.weightsGb)}</span>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Active params</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">
+                            {(selectedModel.paramsBillions * selectedModel.activeFraction).toFixed(1)}B ({(selectedModel.activeFraction * 100).toFixed(0)}%)
+                          </span>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                    </DescriptionList>
+                    <div className="rh-flip-card__hint">↻ Flip for formula</div>
+                  </>
+                }
+                back={
+                  <>
+                    <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsSm" }}>
+                      <FlexItem><span className="pf-v5-u-primary-color-100"><ServerIcon /></span></FlexItem>
+                      <FlexItem>
+                        <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold">Calculation</Text>
+                      </FlexItem>
+                    </Flex>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm">
+                      {selectedModel.paramsBillions}B params × {bytesPerWeight} bytes ({PRECISION_BYTES[precision].label})
+                    </Text>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm pf-v5-u-font-weight-bold pf-v5-u-primary-color-100">
+                      = {fmtGb(result.weightsGb)}
+                    </Text>
+                    <Text component={TextVariants.small} className="pf-v5-u-color-200">
+                      Active params: {(selectedModel.paramsBillions * selectedModel.activeFraction).toFixed(1)}B × {selectedModel.activeFraction < 1 ? `${(selectedModel.activeFraction * 100).toFixed(0)}% (MoE)` : "100% (dense)"}
+                    </Text>
+                    <div className="rh-flip-card__hint">↻ Flip back</div>
+                  </>
+                }
+              />
             </StackItem>
 
-            {/* KV cache */}
+            {/* KV cache — flip card */}
             <StackItem>
-              <ResultSection id="kvCache" icon={<MemoryIcon />}
-                title="KV cache" subtitle="Memory for attention mechanism"
-                expanded={state.expandedSections.kvCache} onToggle={toggleSection}>
-                <DescriptionList columnModifier={{ default: "3Col" }} className="pf-v5-u-mb-md">
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>KV cache</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">{fmtGb(result.kvTotalGb)}</span>
-                      <br />
-                      <Text component={TextVariants.small} className="pf-v5-u-color-200">
-                        {fmtBytes(result.kvBytesPerToken)} per token
-                      </Text>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Total context</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">{fmtTokens(result.totalContextTokens)} tokens</span>
-                      <br />
-                      <Text component={TextVariants.small} className="pf-v5-u-color-200">
-                        {state.concurrentUsers} users × {fmtTokens(CONTEXT_TOKENS[state.contextLength])} tokens
-                      </Text>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                  <DescriptionListGroup>
-                    <DescriptionListTerm>Layers</DescriptionListTerm>
-                    <DescriptionListDescription>
-                      <span className="pf-v5-u-font-weight-bold">{selectedModel.numLayers}</span>
-                    </DescriptionListDescription>
-                  </DescriptionListGroup>
-                </DescriptionList>
-                <Alert variant="custom" isInline isPlain title="Formula">
-                  <Text component={TextVariants.small} className="pf-v5-u-font-family-mono">
-                    2 × {selectedModel.numLayers} layers × {selectedModel.hiddenSize} hidden × {PRECISION_BYTES[precision].kv} bytes
-                    = {fmtBytes(result.kvBytesPerToken)} per token
-                    <br />
-                    {state.concurrentUsers} users × {fmtTokens(CONTEXT_TOKENS[state.contextLength])} tokens
-                    = {fmtTokens(result.totalContextTokens)} tokens total
-                    <br />
-                    Total KV cache: {fmtGb(result.kvTotalGb)}
-                  </Text>
-                </Alert>
-              </ResultSection>
+              <FlipCard height={250}
+                front={
+                  <>
+                    <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsSm" }}>
+                      <FlexItem><span className="pf-v5-u-primary-color-100"><MemoryIcon /></span></FlexItem>
+                      <FlexItem>
+                        <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold" style={{ display: "inline" }}>KV cache</Text>
+                        <Text component={TextVariants.small} className="pf-v5-u-color-200 pf-v5-u-ml-sm" style={{ display: "inline" }}>Memory for attention mechanism</Text>
+                      </FlexItem>
+                    </Flex>
+                    <DescriptionList columnModifier={{ default: "3Col" }}>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>KV cache</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">{fmtGb(result.kvTotalGb)}</span>
+                          <br />
+                          <Text component={TextVariants.small} className="pf-v5-u-color-200">{fmtBytes(result.kvBytesPerToken)} per token</Text>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Total context</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">{fmtTokens(result.totalContextTokens)} tokens</span>
+                          <br />
+                          <Text component={TextVariants.small} className="pf-v5-u-color-200">
+                            {state.concurrentUsers} users × {fmtTokens(CONTEXT_TOKENS[state.contextLength])}
+                          </Text>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                      <DescriptionListGroup>
+                        <DescriptionListTerm>Layers</DescriptionListTerm>
+                        <DescriptionListDescription>
+                          <span className="pf-v5-u-font-weight-bold">{selectedModel.numLayers}</span>
+                        </DescriptionListDescription>
+                      </DescriptionListGroup>
+                    </DescriptionList>
+                    <div className="rh-flip-card__hint">↻ Flip for formula</div>
+                  </>
+                }
+                back={
+                  <>
+                    <Flex alignItems={{ default: "alignItemsCenter" }} spaceItems={{ default: "spaceItemsSm" }}>
+                      <FlexItem><span className="pf-v5-u-primary-color-100"><MemoryIcon /></span></FlexItem>
+                      <FlexItem>
+                        <Text component={TextVariants.p} className="pf-v5-u-font-weight-bold">KV cache formula</Text>
+                      </FlexItem>
+                    </Flex>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm">
+                      2 × {selectedModel.numLayers} layers × {selectedModel.hiddenSize} hidden × {PRECISION_BYTES[precision].kv} bytes
+                    </Text>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm pf-v5-u-font-weight-bold pf-v5-u-primary-color-100">
+                      = {fmtBytes(result.kvBytesPerToken)} per token
+                    </Text>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm">
+                      {state.concurrentUsers} users × {fmtTokens(CONTEXT_TOKENS[state.contextLength])} tokens = {fmtTokens(result.totalContextTokens)}
+                    </Text>
+                    <Text component={TextVariants.p} className="pf-v5-u-font-family-mono pf-v5-u-font-size-sm pf-v5-u-font-weight-bold pf-v5-u-primary-color-100">
+                      = {fmtGb(result.kvTotalGb)} total KV cache
+                    </Text>
+                    <div className="rh-flip-card__hint">↻ Flip back</div>
+                  </>
+                }
+              />
             </StackItem>
 
             {/* VRAM budget */}

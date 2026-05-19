@@ -58,6 +58,53 @@ code, pre, .pf-v5-u-font-family-mono {
   font-family: var(--font-mono) !important;
 }
 
+/* ── Flip card ────────────────────────────────────────────────────────── */
+.rh-flip-card {
+  perspective: 1000px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rh-flip-card__inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.55s ease;
+  transform-style: preserve-3d;
+}
+
+.rh-flip-card--flipped .rh-flip-card__inner {
+  transform: rotateY(180deg);
+}
+
+.rh-flip-card__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: 1px solid var(--pf-v5-global--BorderColor--100);
+  border-radius: 6px;
+  padding: var(--pf-v5-global--spacer--md);
+  background: var(--pf-v5-global--BackgroundColor--100);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-v5-global--spacer--sm);
+}
+
+.rh-flip-card__face--back {
+  transform: rotateY(180deg);
+  background: var(--pf-v5-global--BackgroundColor--100);
+}
+
+.rh-flip-card__hint {
+  margin-top: auto;
+  padding-top: var(--pf-v5-global--spacer--sm);
+  font-size: var(--pf-v5-global--FontSize--sm);
+  color: var(--pf-v5-global--Color--200);
+  text-align: right;
+}
+
 /* Selectable card: use a light red tint so selected state is visible on gray page background */
 .pf-v5-c-card.pf-m-selectable.pf-m-selected {
   --pf-v5-c-card--BackgroundColor: #fff5f5;
