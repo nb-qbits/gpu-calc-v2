@@ -204,7 +204,7 @@ function MemoryGrid({ weightsGb, kvGb, totalGb }: {
       {Array.from({ length: CELLS }, (_, i) => {
         let bg: string;
         if (i < weightCells)               bg = "var(--rh-red)";
-        else if (i < weightCells + kvCells) bg = "#f9a4a4";
+        else if (i < weightCells + kvCells) bg = "var(--rh-red-muted, rgba(238,0,0,0.22))";
         else                               bg = "var(--rh-gray-20)";
         return <div key={i} className="rh-mem-cell" style={{ background: bg }} />;
       })}
@@ -395,7 +395,7 @@ function LiveEstimatePanel({
                   Weights
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "#f9a4a4", display: "inline-block" }} />
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--rh-red-muted, rgba(238,0,0,0.22))", display: "inline-block" }} />
                   KV cache
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -410,13 +410,13 @@ function LiveEstimatePanel({
             <>
               <span style={{ ...label, color: "var(--rh-gray-40)", opacity: 1 }}>PER-GPU SPLIT</span>
               <div style={{ fontSize: "0.85rem", lineHeight: 2.1 }}>
-                <span style={{ color: "var(--rh-red)", fontWeight: 600 }}>
+                <span style={{ color: "var(--rh-red)", fontWeight: 500 }}>
                   {fmtGb(result.weightsGb / result.totalGpus)}
                 </span>{" "}weights<br />
-                <span style={{ color: "#d44", fontWeight: 600 }}>
+                <span style={{ color: "var(--rh-red-dark)", fontWeight: 500 }}>
                   {fmtGb(result.kvTotalGb / result.totalGpus)}
                 </span>{" "}KV cache<br />
-                <span style={{ color: "var(--rh-gray-60)", fontWeight: 600 }}>
+                <span style={{ color: "var(--rh-gray-60)", fontWeight: 500 }}>
                   {fmtGb(freeGb / result.totalGpus)}
                 </span>{" "}free headroom
               </div>
@@ -518,7 +518,7 @@ function ConfigPanel({
           </div>
           <span style={{
             display: "flex", alignItems: "center", gap: 4,
-            fontSize: "0.7rem", fontWeight: 600, color: "var(--rh-red)",
+            fontSize: "0.7rem", fontWeight: 500, color: "var(--rh-red)",
           }}>
             <span style={{ fontSize: "0.8rem" }}>✓</span> SET
           </span>
@@ -560,7 +560,7 @@ function ConfigPanel({
                 }}>
                   {model.vendor}
                 </div>
-                <div style={{ fontWeight: 600, fontSize: "0.85rem", lineHeight: 1.3 }}>
+                <div style={{ fontWeight: 500, fontSize: "0.85rem", lineHeight: 1.3 }}>
                   {model.name}
                 </div>
                 <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
@@ -578,14 +578,14 @@ function ConfigPanel({
         <div style={{
           display: "flex", alignItems: "center", gap: 8,
           marginTop: "0.75rem",
-          background: "#f9f9f9",
+          background: "var(--rh-gray-10)",
           border: "1px solid var(--rh-gray-20)",
           borderRadius: 20,
           padding: "6px 12px",
           fontSize: "0.8rem",
           width: "fit-content",
         }}>
-          <span style={{ color: "var(--rh-red)", fontWeight: 600 }}>✓</span>
+          <span style={{ color: "var(--rh-red)", fontWeight: 500 }}>✓</span>
           <span>
             Selected: <strong>{selectedModel.name}</strong>{" "}
             <span style={{ color: "var(--rh-gray-60)" }}>
@@ -596,7 +596,7 @@ function ConfigPanel({
             onClick={() => galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })}
             style={{
               background: "none", border: "none", cursor: "pointer",
-              color: "var(--rh-red)", fontSize: "0.75rem", fontWeight: 600,
+              color: "var(--rh-red)", fontSize: "0.75rem", fontWeight: 500,
               padding: "0 4px", textDecoration: "underline",
             }}
           >
@@ -607,8 +607,8 @@ function ConfigPanel({
         {/* HuggingFace input */}
         <div style={{
           marginTop: "1rem",
-          background: "#fffbe6",
-          border: "1px solid #e8d9a0",
+          background: "var(--pf-v5-global--BackgroundColor--100, #fff)",
+          border: "1px solid var(--rh-gray-20)",
           borderRadius: 8,
           padding: "14px 16px",
         }}>
@@ -657,7 +657,7 @@ function ConfigPanel({
           </div>
           <span style={{
             display: "flex", alignItems: "center", gap: 4,
-            fontSize: "0.7rem", fontWeight: 600, color: "var(--rh-red)",
+            fontSize: "0.7rem", fontWeight: 500, color: "var(--rh-red)",
           }}>
             <span style={{ fontSize: "0.8rem" }}>✓</span> SET
           </span>
@@ -813,7 +813,7 @@ function ConfigPanel({
                   padding: "7px 14px",
                   border: `1.5px solid ${state.deploymentType === dt.key ? "var(--rh-red)" : "var(--rh-gray-20)"}`,
                   borderRadius: 5,
-                  background: state.deploymentType === dt.key ? "#fff5f5" : "white",
+                  background: state.deploymentType === dt.key ? "var(--rh-red-50)" : "var(--pf-v5-global--BackgroundColor--100)",
                   color: state.deploymentType === dt.key ? "var(--rh-red)" : "var(--rh-gray-60)",
                   fontWeight: state.deploymentType === dt.key ? 600 : 400,
                   cursor: "pointer",
