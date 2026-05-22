@@ -130,3 +130,150 @@ code, pre, .pf-v5-u-font-family-mono {
   --pf-v5-c-button--m-primary--active--BackgroundColor: #a30000;
   --pf-v5-c-button--m-primary--focus--BackgroundColor: #be0000;
 }
+
+/* ── Quick estimate two-column layout ─────────────────────────────────────── */
+.rh-qe-layout {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100%;
+}
+
+.rh-qe-main {
+  flex: 1 1 0%;
+  min-width: 0;
+  padding: 2.5rem 3rem 6rem;
+}
+
+.rh-qe-sidebar {
+  width: 420px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--rh-gray-20);
+  padding: 1.25rem 1.25rem;
+  background: #f5f5f5;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Model gallery ────────────────────────────────────────────────────────── */
+.rh-model-gallery {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--rh-gray-20) transparent;
+}
+
+.rh-model-card {
+  min-width: 128px;
+  max-width: 148px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--rh-gray-20);
+  border-radius: 6px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: white;
+  position: relative;
+  transition: border-color 0.15s;
+  user-select: none;
+}
+
+.rh-model-card:hover { border-color: var(--rh-gray-40); }
+
+.rh-model-card--selected {
+  border-color: var(--rh-red);
+  background: #fff5f5;
+}
+
+/* ── NEW badge ───────────────────────────────────────────────────────────── */
+.rh-badge-new {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: white;
+  background: var(--rh-red);
+  border-radius: 3px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+/* ── Flip card face colour variants ──────────────────────────────────────── */
+.rh-flip-card__face--red {
+  background: var(--rh-red) !important;
+  color: white;
+  border-color: transparent !important;
+}
+
+.rh-flip-card__face--dark {
+  background: var(--rh-gray-95) !important;
+  color: white;
+  border-color: transparent !important;
+}
+
+/* ── Load profile tiles ──────────────────────────────────────────────────── */
+.rh-load-tile {
+  border: 1.5px solid var(--rh-gray-20);
+  border-radius: 8px;
+  padding: 14px 16px;
+  cursor: pointer;
+  background: white;
+  transition: border-color 0.15s;
+  flex: 1;
+  min-width: 0;
+}
+
+.rh-load-tile--active {
+  border-color: var(--rh-red);
+  background: #fffafa;
+}
+
+.rh-load-tile-option {
+  padding: 8px 12px;
+  border: 1.5px solid var(--rh-gray-20);
+  border-radius: 5px;
+  cursor: pointer;
+  background: white;
+  text-align: center;
+  transition: border-color 0.12s, background 0.12s;
+  user-select: none;
+}
+
+.rh-load-tile-option:hover { border-color: var(--rh-gray-40); }
+
+.rh-load-tile-option--selected {
+  border-color: var(--rh-red);
+  background: #fff5f5;
+  color: var(--rh-red);
+  font-weight: 600;
+}
+
+/* ── Memory grid ─────────────────────────────────────────────────────────── */
+.rh-mem-grid {
+  display: grid;
+  grid-template-columns: repeat(22, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.rh-mem-cell {
+  aspect-ratio: 1;
+  border-radius: 1px;
+}
+
+/* ── Status bar ──────────────────────────────────────────────────────────── */
+.rh-qe-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid var(--rh-gray-20);
+  padding-top: 1rem;
+  margin-top: 2.5rem;
+}
