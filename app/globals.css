@@ -131,6 +131,18 @@ code, pre, .pf-v5-u-font-family-mono {
   --pf-v5-c-button--m-primary--focus--BackgroundColor: #be0000;
 }
 
+/* ── Top nav ──────────────────────────────────────────────────────────────── */
+.rh-top-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  justify-content: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.rh-top-nav::-webkit-scrollbar { display: none; }
+
 /* ── Quick estimate two-column layout ─────────────────────────────────────── */
 .rh-qe-layout {
   display: flex;
@@ -157,6 +169,71 @@ code, pre, .pf-v5-u-font-family-mono {
   align-self: flex-start;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Responsive: medium (< 1100px) ───────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .rh-qe-sidebar { width: 340px; }
+  .rh-qe-main { padding: 2rem 2rem 5rem; }
+}
+
+/* ── Responsive: small tablet (< 900px) ──────────────────────────────────── */
+@media (max-width: 900px) {
+  .rh-qe-sidebar { width: 270px; }
+  .rh-qe-main { padding: 1.5rem 1.5rem 4rem; }
+  /* Hide the "tap a tile" hint on narrow sidebar — too cramped */
+  .rh-qe-tap-hint { display: none; }
+}
+
+/* ── Responsive: mobile (< 640px) ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Stack vertically: config on top, estimate panel below */
+  .rh-qe-layout {
+    flex-direction: column;
+  }
+
+  .rh-qe-main {
+    padding: 1.25rem 1rem 3rem;
+    width: 100%;
+  }
+
+  /* Estimate panel: full-width strip below config */
+  .rh-qe-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    position: static;
+    border-left: none;
+    border-top: 1px solid var(--rh-gray-20);
+    overflow-y: visible;
+    align-self: auto;
+  }
+
+  /* Memory layout wrapper: give it a fixed height on mobile instead of flex-grow */
+  .rh-qe-mem-wrap {
+    flex: none !important;
+    min-height: 200px;
+  }
+
+  /* Load tiles: less padding on small screens */
+  .rh-load-tile { padding: 10px 12px; }
+
+  /* Model cards: slightly narrower */
+  .rh-model-card { min-width: 108px; max-width: 126px; }
+
+  /* HF row: allow wrapping so Load button doesn't vanish */
+  .rh-hf-row { flex-wrap: wrap; }
+
+  /* Footer: stack */
+  .rh-qe-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .rh-qe-footer .pf-v5-c-button { width: 100%; justify-content: center; }
+
+  /* Hide version badge to give nav links more room */
+  :root { --rh-version-display: none; }
 }
 
 /* ── Model gallery ────────────────────────────────────────────────────────── */

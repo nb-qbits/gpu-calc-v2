@@ -269,7 +269,7 @@ function LiveEstimatePanel({
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--rh-red)", display: "inline-block" }} />
           LIVE ESTIMATE
         </span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.6rem", color: "var(--rh-gray-40)" }}>
+        <span className="rh-qe-tap-hint" style={{ fontFamily: "var(--font-mono)", fontSize: "0.6rem", color: "var(--rh-gray-40)" }}>
           tap a tile to see the math
         </span>
       </div>
@@ -373,7 +373,7 @@ function LiveEstimatePanel({
       </div>
 
       {/* Memory layout — grows to fill remaining vertical space */}
-      <div style={{ marginTop: 8, flex: 1, display: "flex", flexDirection: "column" }}>
+      <div className="rh-qe-mem-wrap" style={{ marginTop: 8, flex: 1, display: "flex", flexDirection: "column" }}>
         <FlipCard
           height="100%"
           front={
@@ -615,7 +615,7 @@ function ConfigPanel({
           <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.6rem", letterSpacing: "0.07em", color: "var(--rh-gray-60)", marginBottom: 8 }}>
             OR PASTE A HUGGINGFACE MODEL ID
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="rh-hf-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <TextInput
               value={state.hfModelId}
               onChange={(_e, v) => setState((s) => ({ ...s, hfModelId: v }))}

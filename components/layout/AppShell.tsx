@@ -47,16 +47,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </MastheadMain>
 
       <MastheadContent>
-        <nav
-          aria-label="Global navigation"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            flex: 1,
-            justifyContent: "center",
-          }}
-        >
+        <nav aria-label="Global navigation" className="rh-top-nav">
           {navItems.map((item) => {
             const active = pathname === item.href;
             return (
@@ -67,12 +58,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   textDecoration: "none",
                   color: active ? "white" : "rgba(255,255,255,0.65)",
                   fontFamily: "var(--font-body)",
-                  fontSize: "0.875rem",
+                  fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
                   fontWeight: active ? 600 : 400,
-                  padding: "6px 12px",
+                  padding: "6px clamp(6px, 1vw, 12px)",
                   borderRadius: 4,
                   background: active ? "rgba(255,255,255,0.12)" : "transparent",
                   whiteSpace: "nowrap",
+                  flexShrink: 0,
                   transition: "color 0.15s, background 0.15s",
                 }}
               >
@@ -88,6 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           letterSpacing: "0.05em",
           whiteSpace: "nowrap",
           flexShrink: 0,
+          display: "var(--rh-version-display, block)",
         }}>
           v0.5 · redesign
         </span>
