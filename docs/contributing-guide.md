@@ -19,7 +19,7 @@ You will also need:
 
 ```bash
 # Clone the repo
-git clone https://github.com/pankajwithgit/gpu-calc.git
+git clone https://github.com/nb-qbits/gpu-calc-v2.git
 cd gpu-calc
 
 # Install dependencies (also wires up pre-commit hooks automatically)

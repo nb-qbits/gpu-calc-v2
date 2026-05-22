@@ -24,7 +24,7 @@ Live at **[gpu-calc.vercel.app](https://gpu-calc.vercel.app)** · Built with Nex
 ### Setup
 
 ```bash
-git clone https://github.com/pankajwithgit/gpu-calc.git
+git clone https://github.com/nb-qbits/gpu-calc-v2.git
 cd gpu-calc
 npm install
 npm run dev
