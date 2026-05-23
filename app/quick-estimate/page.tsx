@@ -780,6 +780,17 @@ function ConfigPanel({
     onLoadModel(id);
   }
 
+  function handleRetry() {
+    const customId = state.hfModelId.trim();
+    if (customId && customId.includes("/")) {
+      setState((s) => ({ ...s, selectedModelId: "" }));
+      onLoadModel(customId);
+      return;
+    }
+    const galleryModel = MODEL_CATALOG.find((m) => m.id === state.selectedModelId);
+    if (galleryModel) onLoadModel(galleryModel.hfId);
+  }
+
   const tpValue = state.tensorParallelism === "auto" ? 0 : state.tensorParallelism;
 
   return (
@@ -915,11 +926,12 @@ function ConfigPanel({
                   type="password"
                   value={state.hfToken}
                   onChange={(_e, v) => setState((s) => ({ ...s, hfToken: v }))}
+                  onKeyDown={(e) => { if (e.key === "Enter" && state.hfToken) handleRetry(); }}
                   placeholder="hf_..."
                   aria-label="HuggingFace access token"
                   style={{ flex: 1, fontSize: "0.82rem", fontFamily: "var(--font-mono)" }}
                 />
-                <Button variant="secondary" onClick={handleCustomLoad} isDisabled={!state.hfToken}>
+                <Button variant="secondary" onClick={handleRetry} isDisabled={!state.hfToken}>
                   Retry
                 </Button>
               </div>
