@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "configs": [
+    {
+      "version_min": "0.0.0",
+      "version_max": "0.16.9",
+      "act_coeff": 0.27,
+      "notes": "Pre-FlashAttention baseline"
+    },
+    {
+      "version_min": "0.17.0",
+      "version_max": null,
+      "act_coeff": 0.11,
+      "notes": "FlashAttention reduces activation peak significantly"
+    }
+  ]
+}

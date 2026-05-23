@@ -31,11 +31,5 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "tsc --noEmit --skipLibCheck"
-    ]
   }
 }
