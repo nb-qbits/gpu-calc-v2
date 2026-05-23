@@ -1,53 +1,88 @@
 export interface GpuSpec {
-  id: string;
-  name: string;
-  vramGb: number;
-  bandwidthTbps: number;
-  tflops: number;          // BF16 TFLOPS
-  pricePerHour: number;    // cloud rental USD/hr
-  hardwareCostPerGpu: number; // on-prem purchase price
-  powerWatts: number;      // TDP
-  cloudAvailabilityPct: number;
-  tpuAvailabilityPct: number;
+  id:                    string
+  name:                  string
+  vramGb:                number
+  memoryBandwidthGbps:   number   // HBM bandwidth
+  bandwidthTbps:         number   // kept for backward compatibility (= memoryBandwidthGbps / 1000)
+  tflops:                number   // BF16 TFLOPS
+  pricePerHour:          number   // cloud on-demand USD/hr
+  hardwareCostPerGpu:    number   // on-prem purchase price USD
+  powerWatts:            number   // TDP
+  cloudAvailabilityPct:  number
+  tpuAvailabilityPct:    number
 }
 
 export const GPU_CATALOG: GpuSpec[] = [
   {
-    id: 'h100',
-    name: 'NVIDIA H100',
-    vramGb: 80,
-    bandwidthTbps: 3.35,
-    tflops: 989,
-    pricePerHour: 6.00,
-    hardwareCostPerGpu: 30_000,
-    powerWatts: 700,
-    cloudAvailabilityPct: 7,
-    tpuAvailabilityPct: 92,
+    id: 'h100-sxm-80gb',
+    name: 'H100 SXM 80 GB',
+    vramGb: 80, memoryBandwidthGbps: 3350, bandwidthTbps: 3.35,
+    tflops: 989, pricePerHour: 6.00, hardwareCostPerGpu: 30_000,
+    powerWatts: 700, cloudAvailabilityPct: 7, tpuAvailabilityPct: 92,
   },
   {
-    id: 'a100',
-    name: 'NVIDIA A100',
-    vramGb: 80,
-    bandwidthTbps: 2.0,
-    tflops: 312,
-    pricePerHour: 3.20,
-    hardwareCostPerGpu: 15_000,
-    powerWatts: 400,
-    cloudAvailabilityPct: 35,
-    tpuAvailabilityPct: 78,
+    id: 'h100-pcie-80gb',
+    name: 'H100 PCIe 80 GB',
+    vramGb: 80, memoryBandwidthGbps: 2000, bandwidthTbps: 2.0,
+    tflops: 756, pricePerHour: 4.50, hardwareCostPerGpu: 25_000,
+    powerWatts: 350, cloudAvailabilityPct: 15, tpuAvailabilityPct: 80,
   },
   {
-    id: 'l40s',
-    name: 'NVIDIA L40S',
-    vramGb: 48,
-    bandwidthTbps: 0.864,
-    tflops: 362,
-    pricePerHour: 2.50,
-    hardwareCostPerGpu: 12_000,
-    powerWatts: 350,
-    cloudAvailabilityPct: 52,
-    tpuAvailabilityPct: 70,
+    id: 'h200-sxm-141gb',
+    name: 'H200 SXM 141 GB',
+    vramGb: 141, memoryBandwidthGbps: 4800, bandwidthTbps: 4.8,
+    tflops: 989, pricePerHour: 10.00, hardwareCostPerGpu: 50_000,
+    powerWatts: 700, cloudAvailabilityPct: 5, tpuAvailabilityPct: 95,
   },
-];
+  {
+    id: 'a100-sxm-80gb',
+    name: 'A100 SXM 80 GB',
+    vramGb: 80, memoryBandwidthGbps: 2000, bandwidthTbps: 2.0,
+    tflops: 312, pricePerHour: 3.20, hardwareCostPerGpu: 15_000,
+    powerWatts: 400, cloudAvailabilityPct: 35, tpuAvailabilityPct: 78,
+  },
+  {
+    id: 'a100-pcie-80gb',
+    name: 'A100 PCIe 80 GB',
+    vramGb: 80, memoryBandwidthGbps: 1935, bandwidthTbps: 1.935,
+    tflops: 312, pricePerHour: 2.80, hardwareCostPerGpu: 12_000,
+    powerWatts: 300, cloudAvailabilityPct: 40, tpuAvailabilityPct: 75,
+  },
+  {
+    id: 'l40s-48gb',
+    name: 'L40S 48 GB',
+    vramGb: 48, memoryBandwidthGbps: 864, bandwidthTbps: 0.864,
+    tflops: 733, pricePerHour: 2.50, hardwareCostPerGpu: 12_000,
+    powerWatts: 350, cloudAvailabilityPct: 52, tpuAvailabilityPct: 70,
+  },
+  {
+    id: 'mi300x-192gb',
+    name: 'AMD MI300X 192 GB',
+    vramGb: 192, memoryBandwidthGbps: 5300, bandwidthTbps: 5.3,
+    tflops: 1307, pricePerHour: 8.00, hardwareCostPerGpu: 20_000,
+    powerWatts: 750, cloudAvailabilityPct: 10, tpuAvailabilityPct: 50,
+  },
+  {
+    id: 'mi325x-256gb',
+    name: 'AMD MI325X 256 GB',
+    vramGb: 256, memoryBandwidthGbps: 6000, bandwidthTbps: 6.0,
+    tflops: 1307, pricePerHour: 10.00, hardwareCostPerGpu: 25_000,
+    powerWatts: 750, cloudAvailabilityPct: 5, tpuAvailabilityPct: 40,
+  },
+  {
+    id: 'b200-sxm-192gb',
+    name: 'B200 SXM 192 GB',
+    vramGb: 192, memoryBandwidthGbps: 8000, bandwidthTbps: 8.0,
+    tflops: 2250, pricePerHour: 15.00, hardwareCostPerGpu: 60_000,
+    powerWatts: 1000, cloudAvailabilityPct: 2, tpuAvailabilityPct: 98,
+  },
+  {
+    id: 'rtx-4090-24gb',
+    name: 'RTX 4090 24 GB',
+    vramGb: 24, memoryBandwidthGbps: 1008, bandwidthTbps: 1.008,
+    tflops: 330, pricePerHour: 0.80, hardwareCostPerGpu: 2_000,
+    powerWatts: 450, cloudAvailabilityPct: 60, tpuAvailabilityPct: 20,
+  },
+]
 
-export const DEFAULT_GPU = GPU_CATALOG[0];
+export const DEFAULT_GPU = GPU_CATALOG[0]  // H100 SXM 80 GB

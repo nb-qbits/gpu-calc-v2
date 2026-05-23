@@ -1,0 +1,93 @@
+{
+  "_note": "Per-family KV detection hints. layer_types array in config.json always takes priority over these entries.",
+
+  "gemma3_text": {
+    "kv_category": "KV-3b",
+    "is_multimodal": true,
+    "text_config_field": "text_config",
+    "pattern_field": "sliding_window_pattern",
+    "pattern_default": 6,
+    "n_global_formula": "floor(L / pattern)",
+    "verified": true,
+    "note": "layer_types generated at runtime in __post_init__, not present in config.json"
+  },
+
+  "gemma3": {
+    "kv_category": "KV-3b",
+    "is_multimodal": true,
+    "text_config_field": "text_config",
+    "pattern_field": "sliding_window_pattern",
+    "pattern_default": 6,
+    "n_global_formula": "floor(L / pattern)",
+    "verified": true
+  },
+
+  "qwen2_vl": {
+    "max_window_layers_semantics": "first_N_layers_are_full",
+    "fallback": "require_layer_types_or_ask_user"
+  },
+
+  "qwen2_5_vl": {
+    "max_window_layers_semantics": "first_N_layers_are_full",
+    "fallback": "require_layer_types_or_ask_user"
+  },
+
+  "qwen2": {
+    "max_window_layers_semantics": "version_sensitive_or_ambiguous",
+    "fallback": "require_layer_types_or_ask_user",
+    "_note": "Covers Qwen2 and Qwen2.5 — both use model_type=qwen2"
+  },
+
+  "qwen3": {
+    "max_window_layers_semantics": "version_sensitive_or_ambiguous",
+    "fallback": "require_layer_types_or_ask_user"
+  },
+
+  "mamba": {
+    "kv_category": "KV-5a",
+    "state_defaults": {
+      "d_state": { "value": 16, "confidence": "medium" },
+      "d_conv":  { "value": 4,  "confidence": "medium" },
+      "expand":  { "value": 2,  "confidence": "medium" }
+    }
+  },
+
+  "mamba2": {
+    "kv_category": "KV-5a",
+    "state_defaults": {
+      "d_state": { "value": 128, "confidence": "medium" },
+      "d_conv":  { "value": 4,   "confidence": "medium" },
+      "expand":  { "value": 2,   "confidence": "medium" }
+    }
+  },
+
+  "falcon_mamba": {
+    "kv_category": "KV-5a",
+    "state_defaults": {
+      "d_state": { "value": 16, "confidence": "medium" },
+      "d_conv":  { "value": 4,  "confidence": "medium" },
+      "expand":  { "value": 2,  "confidence": "medium" }
+    }
+  },
+
+  "rwkv": {
+    "kv_category": "KV-5a"
+  },
+
+  "recurrent_gemma": {
+    "kv_category": "KV-5c",
+    "block_types_fields": ["_block_types", "block_types", "layers_block_type"],
+    "attention_type": "local",
+    "window_field": "attention_window_size"
+  },
+
+  "hawk": {
+    "kv_category": "KV-5c",
+    "block_types_fields": ["_block_types", "block_types", "layers_block_type"]
+  },
+
+  "griffin": {
+    "kv_category": "KV-5c",
+    "block_types_fields": ["_block_types", "block_types", "layers_block_type"]
+  }
+}
