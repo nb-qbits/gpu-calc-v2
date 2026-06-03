@@ -62,15 +62,20 @@ export default function HomePage() {
   return (
     <>
       <PageSection variant="light">
-        <TextContent>
-          <Title headingLevel="h1" size="2xl">
-            GPU Calc
-          </Title>
-          <Text component="p">
-            LLM inference sizing, GPU comparison, and cost modeling for
-            engineers and infrastructure teams.
-          </Text>
-        </TextContent>
+        <div style={{ position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 0, right: 0, fontSize: '0.875rem', color: '#6A6E73' }}>
+            Work in progress
+          </div>
+          <TextContent>
+            <Title headingLevel="h1" size="2xl">
+              GPU Calc
+            </Title>
+            <Text component="p">
+              LLM inference sizing, GPU comparison, and cost modeling for
+              engineers and infrastructure teams.
+            </Text>
+          </TextContent>
+        </div>
       </PageSection>
 
       <PageSection>
