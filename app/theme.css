@@ -1,0 +1,130 @@
+/* ============================================================
+   gpu-calc · theme.css
+   Typography + color system for legibility on white console.
+   Import once in app/layout.tsx:  import "./theme.css";
+   These intentionally override PatternFly v5 globals that are
+   too light or too small for comfortable reading.
+   ============================================================ */
+
+:root {
+  /* ---- Brand / text colors ---- */
+  --gc-text:        #151515;  /* primary: headings, big numbers, key labels */
+  --gc-text-2:      #3c3f42;  /* body, descriptions, detail + mono values    */
+  --gc-text-3:      #54585c;  /* lightest allowed — short captions only      */
+  --gc-link:        #0066cc;  /* links, buttons, all interactive             */
+  --gc-link-hover:  #004080;
+  --gc-brand-red:   #ee0000;  /* LOGO ONLY — never text, never buttons       */
+
+  /* Status */
+  --gc-success: #3e8635;
+  --gc-warn:    #f0ab00;
+  --gc-warn-text: #8c5b00;
+  --gc-danger:  #c9190b;
+  --gc-info:    #2b9af3;
+
+  /* Chart palette (PatternFly categorical) */
+  --gc-c-blue:   #0066cc;
+  --gc-c-gold:   #f0ab00;
+  --gc-c-green:  #3e8635;
+  --gc-c-purple: #5e40be;
+  --gc-c-orange: #b8390e;
+  --gc-c-teal:   #009596;
+  --gc-c-cyan:   #2b9af3;
+
+  /* ---- Type scale (base 15px) ---- */
+  --gc-fs-page-title:  26px;
+  --gc-fs-card-title:  16px;
+  --gc-fs-metric:      32px;
+  --gc-fs-scenario:    26px;
+  --gc-fs-body:        14px;
+  --gc-fs-detail:      13px;   /* mono values, never smaller in body context */
+  --gc-fs-label:       12px;   /* uppercase eyebrow labels                   */
+  --gc-fs-caption-min: 11.5px; /* absolute floor — nothing smaller anywhere  */
+
+  /* Fonts */
+  --gc-font-display: "Red Hat Display", system-ui, sans-serif;
+  --gc-font-sans:    "Red Hat Text", system-ui, sans-serif;
+  --gc-font-mono:    "Red Hat Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* ============================================================
+     PatternFly v5 global token overrides
+     PF defaults are lighter/smaller than we want. Re-point them.
+     ============================================================ */
+  --pf-v5-global--Color--100: var(--gc-text);    /* primary text  */
+  --pf-v5-global--Color--200: var(--gc-text-2);  /* PF default #6a6e73 is too light */
+  --pf-v5-global--link--Color: var(--gc-link);
+  --pf-v5-global--link--Color--hover: var(--gc-link-hover);
+  --pf-v5-global--primary-color--100: var(--gc-link);
+
+  --pf-v5-global--FontSize--md: 15px;  /* base */
+  --pf-v5-global--FontFamily--text: var(--gc-font-sans);
+  --pf-v5-global--FontFamily--heading: var(--gc-font-display);
+  --pf-v5-global--FontFamily--monospace: var(--gc-font-mono);
+}
+
+html, body {
+  font-family: var(--gc-font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--gc-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Reusable text utility classes ----
+   Use these instead of inline gray/size values in components. */
+
+.gc-page-title  { font-family: var(--gc-font-display); font-size: var(--gc-fs-page-title); font-weight: 500; letter-spacing: -0.01em; color: var(--gc-text); }
+.gc-card-title  { font-family: var(--gc-font-display); font-size: var(--gc-fs-card-title); font-weight: 600; color: var(--gc-text); }
+.gc-metric      { font-family: var(--gc-font-display); font-size: var(--gc-fs-metric); font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--gc-text); font-variant-numeric: tabular-nums; }
+.gc-scenario    { font-family: var(--gc-font-display); font-size: var(--gc-fs-scenario); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+
+.gc-body        { font-size: var(--gc-fs-body); color: var(--gc-text-2); }
+.gc-detail      { font-family: var(--gc-font-mono); font-size: var(--gc-fs-detail); color: var(--gc-text-2); font-variant-numeric: tabular-nums; }
+
+/* Eyebrow / uppercase label — readable, never the lightest gray */
+.gc-label {
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-label);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gc-text-2);
+}
+
+/* Smallest allowed caption */
+.gc-caption {
+  font-family: var(--gc-font-mono);
+  font-size: var(--gc-fs-caption-min);
+  color: var(--gc-text-3);
+}
+
+/* Units beside numbers (GB, MB, ×) */
+.gc-unit { font-family: var(--gc-font-sans); font-size: 13px; font-weight: 500; color: var(--gc-text-3); white-space: nowrap; }
+
+/* Numbers always tabular */
+.gc-num { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   Hard floors — guard against PatternFly components rendering
+   text too light or too small. Bump common offenders.
+   ============================================================ */
+
+/* Description list terms / helper text default to PF light gray — darken. */
+.pf-v5-c-description-list__term,
+.pf-v5-c-form__helper-text,
+.pf-v5-c-helper-text__item-text,
+.pf-v5-c-table caption {
+  color: var(--gc-text-2);
+}
+
+/* Never render content text below the caption floor. */
+.pf-v5-c-content small,
+small { font-size: var(--gc-fs-caption-min); }
+
+/*
+  RULES (enforced by convention, not CSS):
+  - Body/detail/values: --gc-text-2 (#3c3f42) or darker. Never --gc-text-3 for content.
+  - Nothing below 11.5px.
+  - Uppercase labels: letter-spacing <= 0.08em, color >= --gc-text-2.
+  - Brand red is LOGO ONLY.
+*/

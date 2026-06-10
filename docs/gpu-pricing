@@ -1,0 +1,1290 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// src/storage.js
+var storage_exports = {};
+__export(storage_exports, {
+  completeRun: () => completeRun,
+  getPendingAlerts: () => getPendingAlerts,
+  getPriceDiff: () => getPriceDiff,
+  getPriceHistory: () => getPriceHistory,
+  getPrices: () => getPrices,
+  getRunHistory: () => getRunHistory,
+  resolveAlert: () => resolveAlert,
+  savePrices: () => savePrices,
+  saveRun: () => saveRun
+});
+async function savePrices(db, kv, validated, runId) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const savedIds = [];
+  for (const price of validated.approved) {
+    try {
+      await db.prepare(`
+        INSERT INTO prices (
+          id, provider, category, gpu, vram_gb, model,
+          pricing_type, price_usd, unit, gpu_count, region,
+          source_url, confidence, status, fetched_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          price_usd    = excluded.price_usd,
+          confidence   = excluded.confidence,
+          source_url   = excluded.source_url,
+          fetched_at   = excluded.fetched_at,
+          updated_at   = excluded.updated_at,
+          status       = 'approved'
+      `).bind(
+        price.id,
+        price.provider,
+        price.category,
+        price.gpu || null,
+        price.vram_gb || null,
+        price.model || null,
+        price.pricing_type,
+        price.price_usd,
+        price.unit,
+        price.gpu_count || 1,
+        price.region || null,
+        price.source_url,
+        price.confidence,
+        now,
+        now
+      ).run();
+      await db.prepare(`
+        INSERT INTO price_history (price_id, price_usd, fetched_at, run_id)
+        VALUES (?, ?, ?, ?)
+      `).bind(price.id, price.price_usd, now, runId).run();
+      savedIds.push(price.id);
+    } catch (err) {
+      console.error(`Failed to save price ${price.id}:`, err.message);
+    }
+  }
+  for (const price of validated.pending) {
+    try {
+      await db.prepare(`
+        INSERT INTO prices (
+          id, provider, category, gpu, vram_gb, model,
+          pricing_type, price_usd, unit, gpu_count, region,
+          source_url, confidence, status, fetched_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_review', ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          status = 'pending_review',
+          fetched_at = excluded.fetched_at
+      `).bind(
+        price.id,
+        price.provider,
+        price.category,
+        price.gpu || null,
+        price.vram_gb || null,
+        price.model || null,
+        price.pricing_type,
+        price.price_usd,
+        price.unit,
+        price.gpu_count || 1,
+        price.region || null,
+        price.source_url,
+        price.confidence,
+        now,
+        now
+      ).run();
+      await db.prepare(`
+        INSERT INTO alerts (price_id, run_id, old_price, new_price, change_pct)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        price.id,
+        runId,
+        price.validation.old_price || null,
+        price.price_usd,
+        price.validation.change_pct || null
+      ).run();
+    } catch (err) {
+      console.error(`Failed to save pending ${price.id}:`, err.message);
+    }
+  }
+  await kv.delete(KV_PRICES_KEY);
+  return savedIds;
+}
+async function getPrices(db, kv, filters = {}) {
+  if (!filters.category && !filters.gpu && !filters.provider) {
+    const cached = await kv.get(KV_PRICES_KEY, "json");
+    if (cached) return { prices: cached, source: "cache" };
+  }
+  let query = `SELECT * FROM prices WHERE status = 'approved'`;
+  const bindings = [];
+  if (filters.category) {
+    query += ` AND category = ?`;
+    bindings.push(filters.category);
+  }
+  if (filters.gpu) {
+    query += ` AND gpu = ?`;
+    bindings.push(filters.gpu);
+  }
+  if (filters.provider) {
+    query += ` AND provider = ?`;
+    bindings.push(filters.provider);
+  }
+  if (filters.pricing_type) {
+    query += ` AND pricing_type = ?`;
+    bindings.push(filters.pricing_type);
+  }
+  if (filters.confidence) {
+    query += ` AND confidence = ?`;
+    bindings.push(filters.confidence);
+  }
+  query += ` ORDER BY category, gpu, price_usd ASC`;
+  const { results } = await db.prepare(query).bind(...bindings).all();
+  if (!filters.category && !filters.gpu && !filters.provider) {
+    await kv.put(KV_PRICES_KEY, JSON.stringify(results), { expirationTtl: KV_TTL_SECONDS });
+  }
+  return { prices: results, source: "db" };
+}
+async function getPriceHistory(db, priceId, days = 90) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1e3).toISOString();
+  const { results } = await db.prepare(`
+    SELECT ph.*, p.provider, p.gpu, p.model, p.unit
+    FROM price_history ph
+    JOIN prices p ON ph.price_id = p.id
+    WHERE ph.price_id = ? AND ph.fetched_at > ?
+    ORDER BY ph.fetched_at ASC
+  `).bind(priceId, since).all();
+  return results;
+}
+async function getPriceDiff(db, sinceHours = 24 * 7) {
+  const since = new Date(Date.now() - sinceHours * 60 * 60 * 1e3).toISOString();
+  const { results } = await db.prepare(`
+    SELECT 
+      p.id, p.provider, p.gpu, p.model, p.pricing_type, p.region,
+      p.price_usd as current_price,
+      h_old.price_usd as old_price,
+      ROUND((p.price_usd - h_old.price_usd) / h_old.price_usd * 100, 1) as change_pct
+    FROM prices p
+    JOIN price_history h_old ON p.id = h_old.price_id
+    WHERE h_old.fetched_at <= ? 
+      AND p.status = 'approved'
+      AND ABS(p.price_usd - h_old.price_usd) / h_old.price_usd > 0.01
+    GROUP BY p.id
+    HAVING h_old.fetched_at = MIN(h_old.fetched_at)
+    ORDER BY ABS(change_pct) DESC
+    LIMIT 50
+  `).bind(since).all();
+  return results;
+}
+async function getPendingAlerts(db) {
+  const { results } = await db.prepare(`
+    SELECT a.*, p.provider, p.gpu, p.model, p.pricing_type, p.region, p.source_url
+    FROM alerts a
+    JOIN prices p ON a.price_id = p.id
+    WHERE a.status = 'pending'
+    ORDER BY ABS(a.change_pct) DESC
+  `).all();
+  return results;
+}
+async function resolveAlert(db, kv, alertId, action) {
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const alert = await db.prepare(`SELECT * FROM alerts WHERE id = ?`).bind(alertId).first();
+  if (!alert) return { error: "Alert not found" };
+  if (action === "confirm") {
+    await db.prepare(`
+      UPDATE prices SET status = 'approved', price_usd = ?, updated_at = ?
+      WHERE id = ?
+    `).bind(alert.new_price, now, alert.price_id).run();
+  } else {
+    await db.prepare(`
+      UPDATE prices SET status = 'approved', updated_at = ?
+      WHERE id = ?
+    `).bind(now, alert.price_id).run();
+  }
+  await db.prepare(`
+    UPDATE alerts SET status = ?, resolved_at = ? WHERE id = ?
+  `).bind(action === "confirm" ? "confirmed" : "rejected", now, alertId).run();
+  await kv.delete(KV_PRICES_KEY);
+  return { success: true, action, price_id: alert.price_id };
+}
+async function saveRun(db, run) {
+  await db.prepare(`
+    INSERT INTO runs (id, trigger, sources, started_at, status)
+    VALUES (?, ?, ?, ?, 'running')
+  `).bind(run.id, run.trigger, JSON.stringify(run.sources), run.started_at).run();
+}
+async function completeRun(db, runId, stats) {
+  await db.prepare(`
+    UPDATE runs SET
+      completed_at     = ?,
+      status           = 'completed',
+      records_fetched  = ?,
+      records_updated  = ?,
+      records_pending  = ?,
+      errors           = ?
+    WHERE id = ?
+  `).bind(
+    (/* @__PURE__ */ new Date()).toISOString(),
+    stats.fetched,
+    stats.updated,
+    stats.pending,
+    JSON.stringify(stats.errors || []),
+    runId
+  ).run();
+}
+async function getRunHistory(db, limit = 10) {
+  const { results } = await db.prepare(`
+    SELECT * FROM runs ORDER BY started_at DESC LIMIT ?
+  `).bind(limit).all();
+  return results;
+}
+var KV_PRICES_KEY, KV_TTL_SECONDS;
+var init_storage = __esm({
+  "src/storage.js"() {
+    KV_PRICES_KEY = "latest-prices-v1";
+    KV_TTL_SECONDS = 60 * 60 * 6;
+    __name(savePrices, "savePrices");
+    __name(getPrices, "getPrices");
+    __name(getPriceHistory, "getPriceHistory");
+    __name(getPriceDiff, "getPriceDiff");
+    __name(getPendingAlerts, "getPendingAlerts");
+    __name(resolveAlert, "resolveAlert");
+    __name(saveRun, "saveRun");
+    __name(completeRun, "completeRun");
+    __name(getRunHistory, "getRunHistory");
+  }
+});
+
+// src/collectors/aws.js
+async function collectAWS() {
+  const results = getAWSKnownPrices();
+  return { results, errors: [], source: "aws" };
+}
+__name(collectAWS, "collectAWS");
+function getAWSKnownPrices() {
+  const instances = [
+    // H100 — p5.48xlarge (8× H100 80GB SXM5)
+    { instance: "p5.48xlarge", gpu: "H100", vram: 80, count: 8, price: 98.32, region: "us-east-1" },
+    { instance: "p5.48xlarge", gpu: "H100", vram: 80, count: 8, price: 105.14, region: "us-west-2" },
+    // H200 — p5e.48xlarge (8× H200 141GB SXM5)
+    { instance: "p5e.48xlarge", gpu: "H200", vram: 141, count: 8, price: 147.6, region: "us-east-1" },
+    // A100 80GB — p4de.24xlarge (8× A100 80GB)
+    { instance: "p4de.24xlarge", gpu: "A100", vram: 80, count: 8, price: 40.97, region: "us-east-1" },
+    { instance: "p4de.24xlarge", gpu: "A100", vram: 80, count: 8, price: 40.97, region: "us-west-2" },
+    // A100 40GB — p4d.24xlarge (8× A100 40GB)
+    { instance: "p4d.24xlarge", gpu: "A100", vram: 40, count: 8, price: 32.77, region: "us-east-1" },
+    { instance: "p4d.24xlarge", gpu: "A100", vram: 40, count: 8, price: 32.77, region: "us-west-2" },
+    // A10G — g5.48xlarge (8× A10G 24GB)
+    { instance: "g5.48xlarge", gpu: "A10G", vram: 24, count: 8, price: 16.29, region: "us-east-1" },
+    // A10G — g5.xlarge (1× A10G 24GB)
+    { instance: "g5.xlarge", gpu: "A10G", vram: 24, count: 1, price: 1.006, region: "us-east-1" }
+  ];
+  return instances.map((inst) => ({
+    id: `aws-${inst.gpu.toLowerCase()}-${inst.vram}gb-ondemand-${inst.region}-${inst.instance}`,
+    provider: "AWS",
+    category: "gpu_cloud",
+    gpu: inst.gpu,
+    vram_gb: inst.vram,
+    pricing_type: "on_demand",
+    price_usd: inst.price,
+    unit: "per_instance_hour",
+    gpu_count: inst.count,
+    region: inst.region,
+    source_url: "https://aws.amazon.com/ec2/pricing/on-demand/",
+    confidence: "medium",
+    notes: `${inst.instance} \xB7 ${inst.count}\xD7 ${inst.gpu} ${inst.vram}GB \xB7 manually verified Apr 2026`
+  }));
+}
+__name(getAWSKnownPrices, "getAWSKnownPrices");
+
+// src/collectors/gcp.js
+async function collectGCP() {
+  const results = getGCPKnownPrices();
+  return { results, errors: [], source: "gcp" };
+}
+__name(collectGCP, "collectGCP");
+function getGCPKnownPrices() {
+  const gpus = [
+    // H100 — a3-highgpu-8g (8× H100 80GB SXM5)
+    { gpu: "H100", vram: 80, price_per_gpu: 3.2, instance: "a3-highgpu-8g", count: 8 },
+    // H200 — a3plus-highgpu-8g
+    { gpu: "H200", vram: 141, price_per_gpu: 4.99, instance: "a3plus-highgpu-8g", count: 8 },
+    // A100 80GB — a2-ultragpu-1g
+    { gpu: "A100", vram: 80, price_per_gpu: 3.67, instance: "a2-ultragpu-1g", count: 1 },
+    // A100 40GB — a2-highgpu-1g
+    { gpu: "A100", vram: 40, price_per_gpu: 2.48, instance: "a2-highgpu-1g", count: 1 },
+    // L4 — g2-standard-4
+    { gpu: "L4", vram: 24, price_per_gpu: 0.7, instance: "g2-standard-4", count: 1 },
+    // T4 — n1-standard-4 + 1× T4
+    { gpu: "T4", vram: 16, price_per_gpu: 0.35, instance: "n1+t4", count: 1 },
+    // V100 — n1-standard-8 + 1× V100
+    { gpu: "V100", vram: 16, price_per_gpu: 0.74, instance: "n1+v100", count: 1 },
+    { gpu: "V100", vram: 32, price_per_gpu: 1.35, instance: "n1+v100-32gb", count: 1 }
+  ];
+  const regions = ["us-central1", "us-east4", "europe-west4"];
+  return gpus.flatMap(
+    (g) => regions.map((region) => ({
+      id: `gcp-${g.gpu.toLowerCase()}-${g.vram}gb-ondemand-${region}-${g.instance}`,
+      provider: "GCP",
+      category: "gpu_cloud",
+      gpu: g.gpu,
+      vram_gb: g.vram,
+      pricing_type: "on_demand",
+      price_usd: g.price_per_gpu,
+      unit: "per_gpu_hour",
+      gpu_count: g.count,
+      region,
+      source_url: "https://cloud.google.com/compute/gpus-pricing",
+      confidence: "medium",
+      notes: `${g.instance} \xB7 manually verified Apr 2026`
+    }))
+  );
+}
+__name(getGCPKnownPrices, "getGCPKnownPrices");
+
+// src/collectors/azure.js
+var AZURE_REGIONS = [
+  "eastus",
+  "westus2"
+];
+async function collectAzure() {
+  const results = [];
+  const errors = [];
+  for (const region of AZURE_REGIONS) {
+    try {
+      const regionResults = await fetchAzureRegion(region);
+      results.push(...regionResults);
+    } catch (err) {
+      errors.push({ source: `azure-${region}`, error: err.message });
+    }
+  }
+  return { results, errors, source: "azure" };
+}
+__name(collectAzure, "collectAzure");
+async function fetchAzureRegion(region) {
+  const results = [];
+  const queries = [
+    // H100 VMs
+    `serviceName eq 'Virtual Machines' and armRegionName eq '${region}' and contains(skuName, 'H100')`,
+    // A100 VMs  
+    `serviceName eq 'Virtual Machines' and armRegionName eq '${region}' and contains(skuName, 'A100')`,
+    // MI300X VMs
+    `serviceName eq 'Virtual Machines' and armRegionName eq '${region}' and contains(skuName, 'MI300X')`,
+    // V100 VMs (ND series)
+    `serviceName eq 'Virtual Machines' and armRegionName eq '${region}' and contains(productName, 'ND Series')`
+  ];
+  for (const filter of queries) {
+    const url = `https://prices.azure.com/api/retail/prices?api-version=2023-01-01-preview&$filter=${encodeURIComponent(filter)}`;
+    let nextUrl = url;
+    let pageCount = 0;
+    while (nextUrl && pageCount < 5) {
+      const resp = await fetch(nextUrl, { cf: { cacheTtl: 3600 } });
+      if (!resp.ok) throw new Error(`Azure API ${resp.status} for ${region}`);
+      const data = await resp.json();
+      pageCount++;
+      for (const item of data.Items || []) {
+        if (item.productName?.includes("Windows")) continue;
+        if (item.skuName?.includes("Low Priority")) continue;
+        if (item.type === "DevTestConsumption") continue;
+        if (item.productName?.includes("Dedicated Host")) continue;
+        if (item.skuName?.includes("Type1") || item.skuName?.includes("Type2")) continue;
+        const gpuInfo = parseAzureSku(item.skuName, item.productName);
+        if (!gpuInfo) continue;
+        const pricingType = item.skuName?.includes("Spot") ? "spot" : item.type === "Reservation" ? "reserved_1yr" : "on_demand";
+        const priceUSD = item.retailPrice || 0;
+        if (!priceUSD) continue;
+        results.push({
+          id: `azure-${gpuInfo.gpu.toLowerCase()}-${gpuInfo.vram}gb-${pricingType}-${region}-${item.skuName?.replace(/\s+/g, "-").toLowerCase()}`,
+          provider: "Azure",
+          category: "gpu_cloud",
+          gpu: gpuInfo.gpu,
+          vram_gb: gpuInfo.vram,
+          model: null,
+          pricing_type: pricingType,
+          price_usd: priceUSD,
+          unit: "per_instance_hour",
+          gpu_count: gpuInfo.count,
+          price_per_gpu: priceUSD / (gpuInfo.count || 1),
+          region,
+          sku_name: item.skuName,
+          source_url: url,
+          confidence: "high",
+          // Official Azure API
+          notes: `${item.productName} \xB7 ${item.skuName} \xB7 ${gpuInfo.count} GPU(s) \xB7 $${(priceUSD / (gpuInfo.count || 1)).toFixed(2)}/GPU/hr`
+        });
+      }
+      nextUrl = data.NextPageLink || null;
+    }
+  }
+  return results;
+}
+__name(fetchAzureRegion, "fetchAzureRegion");
+function parseAzureSku(skuName, productName) {
+  const combined = `${skuName || ""} ${productName || ""}`.toLowerCase();
+  if (combined.includes("h200")) return { gpu: "H200", vram: 141, count: 8 };
+  if (combined.includes("h100") && combined.includes("nc80")) return { gpu: "H100", vram: 80, count: 1 };
+  if (combined.includes("h100") && combined.includes("nc160")) return { gpu: "H100", vram: 80, count: 2 };
+  if (combined.includes("h100")) return { gpu: "H100", vram: 80, count: 8 };
+  if (combined.includes("mi300x")) return { gpu: "MI300X", vram: 192, count: 8 };
+  if (combined.includes("a100") && combined.includes("80")) return { gpu: "A100", vram: 80, count: 8 };
+  if (combined.includes("a100")) return { gpu: "A100", vram: 40, count: 8 };
+  if (combined.includes("v100") && combined.includes("32")) return { gpu: "V100", vram: 32, count: 8 };
+  if (combined.includes("v100")) return { gpu: "V100", vram: 16, count: 8 };
+  if (combined.includes("t4")) return { gpu: "T4", vram: 16, count: 1 };
+  return null;
+}
+__name(parseAzureSku, "parseAzureSku");
+
+// src/collectors/vastai.js
+var VAST_GPU_TYPES = [
+  "H100_SXM5",
+  "H100_PCIE",
+  "H200_SXM5",
+  "A100_SXM4_80GB",
+  "A100_PCIE_80GB",
+  "A100_SXM4_40GB",
+  "RTX_4090",
+  "RTX_3090",
+  "A6000",
+  "L40S",
+  "MI300X"
+];
+async function collectVastAI() {
+  const results = [];
+  const errors = [];
+  for (const gpuType of VAST_GPU_TYPES) {
+    try {
+      const gpuResults = await fetchVastGPU(gpuType);
+      results.push(...gpuResults);
+    } catch (err) {
+      errors.push({ source: `vastai-${gpuType}`, error: err.message });
+    }
+  }
+  return { results, errors, source: "vastai" };
+}
+__name(collectVastAI, "collectVastAI");
+async function fetchVastGPU(gpuType) {
+  const url = `https://console.vast.ai/api/v0/bundles/?gpu_name=${gpuType}&num_gpus=1&order=score-&type=on-demand&limit=20`;
+  const resp = await fetch(url, {
+    headers: { "Accept": "application/json" },
+    cf: { cacheTtl: 1800 }
+    // Cache 30 min — spot prices change often
+  });
+  if (!resp.ok) {
+    if (resp.status === 404) return [];
+    throw new Error(`Vast.ai API ${resp.status} for ${gpuType}`);
+  }
+  const data = await resp.json();
+  const offers = data.offers || [];
+  if (offers.length === 0) return [];
+  const prices = offers.map((o) => o.dph_total || 0).filter((p) => p > 0).sort((a, b) => a - b);
+  if (prices.length === 0) return [];
+  const minPrice = prices[0];
+  const medianPrice = prices[Math.floor(prices.length / 2)];
+  const p25 = prices[Math.floor(prices.length * 0.25)];
+  const gpuSpec = parseVastGPUType(gpuType);
+  if (!gpuSpec) return [];
+  return [
+    {
+      id: `vastai-${gpuSpec.gpu.toLowerCase()}-${gpuSpec.vram}gb-spot-min`,
+      provider: "Vast.ai",
+      category: "gpu_cloud",
+      gpu: gpuSpec.gpu,
+      vram_gb: gpuSpec.vram,
+      model: null,
+      pricing_type: "spot",
+      price_usd: minPrice,
+      unit: "per_gpu_hour",
+      gpu_count: 1,
+      region: "global",
+      source_url: url,
+      confidence: "high",
+      notes: `Vast.ai marketplace min (${prices.length} offers available)`,
+      offers_available: prices.length,
+      price_p25: p25,
+      price_median: medianPrice
+    },
+    {
+      id: `vastai-${gpuSpec.gpu.toLowerCase()}-${gpuSpec.vram}gb-spot-median`,
+      provider: "Vast.ai",
+      category: "gpu_cloud",
+      gpu: gpuSpec.gpu,
+      vram_gb: gpuSpec.vram,
+      model: null,
+      pricing_type: "spot_median",
+      price_usd: medianPrice,
+      unit: "per_gpu_hour",
+      gpu_count: 1,
+      region: "global",
+      source_url: url,
+      confidence: "high",
+      notes: `Vast.ai marketplace median (${prices.length} offers)`
+    }
+  ];
+}
+__name(fetchVastGPU, "fetchVastGPU");
+function parseVastGPUType(gpuType) {
+  const map = {
+    "H100_SXM5": { gpu: "H100", vram: 80 },
+    "H100_PCIE": { gpu: "H100", vram: 80 },
+    "H200_SXM5": { gpu: "H200", vram: 141 },
+    "A100_SXM4_80GB": { gpu: "A100", vram: 80 },
+    "A100_PCIE_80GB": { gpu: "A100", vram: 80 },
+    "A100_SXM4_40GB": { gpu: "A100", vram: 40 },
+    "RTX_4090": { gpu: "RTX4090", vram: 24 },
+    "RTX_3090": { gpu: "RTX3090", vram: 24 },
+    "A6000": { gpu: "A6000", vram: 48 },
+    "L40S": { gpu: "L40S", vram: 48 },
+    "MI300X": { gpu: "MI300X", vram: 192 }
+  };
+  return map[gpuType] || null;
+}
+__name(parseVastGPUType, "parseVastGPUType");
+
+// src/collectors/api-tokens.js
+async function collectAPITokens() {
+  const results = [];
+  const errors = [];
+  const providers = [
+    {
+      name: "anthropic",
+      url: "https://www.anthropic.com/pricing",
+      fn: getAnthropicFallback
+    },
+    {
+      name: "openai",
+      url: "https://openai.com/api/pricing",
+      fn: getOpenAIFallback
+    },
+    {
+      name: "google",
+      url: "https://ai.google.dev/gemini-api/docs/pricing",
+      fn: getGoogleFallback
+    }
+  ];
+  for (const prov of providers) {
+    try {
+      const scraped = await scrapeWithClaude(prov.url, prov.name);
+      if (scraped && scraped.length > 0) {
+        results.push(...scraped);
+        continue;
+      }
+    } catch (err) {
+      errors.push({ source: prov.name + "-scrape", error: err.message });
+    }
+    try {
+      results.push(...prov.fn(prov.url));
+    } catch (err) {
+      errors.push({ source: prov.name + "-fallback", error: err.message });
+    }
+  }
+  return { results, errors, source: "api_tokens" };
+}
+__name(collectAPITokens, "collectAPITokens");
+async function scrapeWithClaude(url, providerName) {
+  const pageResp = await fetch(url, {
+    headers: { "User-Agent": "gpu.calc pricing bot" },
+    cf: { cacheTtl: 3600 }
+  });
+  if (!pageResp.ok) throw new Error(`HTTP ${pageResp.status} from ${url}`);
+  const fullHtml = await pageResp.text();
+  const html = fullHtml.slice(0, 3e4);
+  const claudeResp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1e3,
+      system: `You are a data extraction assistant. Extract API pricing from HTML pages.
+Return ONLY valid JSON, no markdown, no explanation.
+Format: [{"model":"model name","input":price_per_1m_tokens,"output":price_per_1m_tokens}]
+Rules:
+- Prices must be numbers in USD per 1 million tokens
+- Only include models with clear input AND output prices
+- Skip deprecated, preview, or experimental models unless they are the only option
+- If a price shows e.g. "$3 / MTok" that means input=3.0
+- Return [] if you cannot find any prices`,
+      messages: [{
+        role: "user",
+        content: `Extract all API model pricing from this ${providerName} pricing page HTML:
+
+${html}`
+      }]
+    })
+  });
+  if (!claudeResp.ok) throw new Error(`Claude API ${claudeResp.status}`);
+  const claudeData = await claudeResp.json();
+  const text = claudeData.content?.[0]?.text || "[]";
+  let parsed;
+  try {
+    parsed = JSON.parse(text.trim());
+  } catch (e) {
+    throw new Error(`Claude returned invalid JSON: ${text.slice(0, 100)}`);
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return [];
+  const providerNames = {
+    anthropic: "Anthropic",
+    openai: "OpenAI",
+    google: "Google"
+  };
+  const provider = providerNames[providerName] || providerName;
+  return parsed.flatMap((m) => {
+    if (!m.model || !m.input || !m.output) return [];
+    return [
+      makeRecord(provider, m.model, m.input, "per_1m_input_tokens", url, "high", "claude-scraped"),
+      makeRecord(provider, m.model, m.output, "per_1m_output_tokens", url, "high", "claude-scraped")
+    ];
+  });
+}
+__name(scrapeWithClaude, "scrapeWithClaude");
+function getAnthropicFallback(url) {
+  const models = [
+    { model: "Claude Opus 4.6", input: 5, output: 25 },
+    { model: "Claude Sonnet 4.6", input: 3, output: 15 },
+    { model: "Claude Haiku 4.5", input: 1, output: 5 },
+    // Legacy still available
+    { model: "Claude 3.7 Sonnet", input: 3, output: 15 },
+    { model: "Claude 3.5 Haiku", input: 0.8, output: 4 }
+  ];
+  return models.flatMap((m) => [
+    makeRecord("Anthropic", m.model, m.input, "per_1m_input_tokens", url, "medium", "verified-apr-2026"),
+    makeRecord("Anthropic", m.model, m.output, "per_1m_output_tokens", url, "medium", "verified-apr-2026")
+  ]);
+}
+__name(getAnthropicFallback, "getAnthropicFallback");
+function getOpenAIFallback(url) {
+  const models = [
+    { model: "GPT-4.1", input: 2, output: 8 },
+    { model: "GPT-4.1 mini", input: 0.4, output: 1.6 },
+    { model: "GPT-4.1 nano", input: 0.05, output: 0.2 },
+    { model: "GPT-4o", input: 2.5, output: 10 },
+    { model: "GPT-4o mini", input: 0.15, output: 0.6 },
+    { model: "o3", input: 10, output: 40 },
+    { model: "o3 mini", input: 1.1, output: 4.4 },
+    { model: "o4 mini", input: 1.1, output: 4.4 }
+  ];
+  return models.flatMap((m) => [
+    makeRecord("OpenAI", m.model, m.input, "per_1m_input_tokens", url, "medium", "verified-apr-2026"),
+    makeRecord("OpenAI", m.model, m.output, "per_1m_output_tokens", url, "medium", "verified-apr-2026")
+  ]);
+}
+__name(getOpenAIFallback, "getOpenAIFallback");
+function getGoogleFallback(url) {
+  const models = [
+    { model: "Gemini 2.5 Pro", input: 1.25, output: 10 },
+    { model: "Gemini 2.5 Flash", input: 0.3, output: 2.5 },
+    { model: "Gemini 2.5 Flash-Lite", input: 0.1, output: 0.4 },
+    { model: "Gemini 2.0 Flash", input: 0.1, output: 0.4 }
+  ];
+  return models.flatMap((m) => [
+    makeRecord("Google", m.model, m.input, "per_1m_input_tokens", url, "medium", "verified-apr-2026"),
+    makeRecord("Google", m.model, m.output, "per_1m_output_tokens", url, "medium", "verified-apr-2026")
+  ]);
+}
+__name(getGoogleFallback, "getGoogleFallback");
+function makeRecord(provider, model, price, unit, sourceUrl, confidence, notes) {
+  const suffix = unit.includes("output") ? "-output" : "-input";
+  return {
+    id: `${provider.toLowerCase()}-${model.toLowerCase().replace(/[\s.]+/g, "-")}${suffix}`,
+    provider,
+    category: "api_token",
+    gpu: null,
+    model,
+    pricing_type: "api",
+    price_usd: price,
+    unit,
+    gpu_count: null,
+    region: "global",
+    source_url: sourceUrl,
+    confidence,
+    notes
+  };
+}
+__name(makeRecord, "makeRecord");
+
+// src/collectors/specialists.js
+async function collectSpecialists() {
+  const results = [];
+  const errors = [];
+  const collectors = [
+    { name: "runpod", fn: fetchRunPod },
+    // GraphQL API = 1 request
+    { name: "coreweave", fn: fetchCoreWeave }
+    // HTML scrape = 1 request
+  ];
+  for (const { name, fn } of collectors) {
+    try {
+      const r = await fn();
+      results.push(...r);
+    } catch (err) {
+      errors.push({ source: name, error: err.message });
+    }
+  }
+  return { results, errors, source: "specialists" };
+}
+__name(collectSpecialists, "collectSpecialists");
+async function fetchCoreWeave() {
+  const url = "https://www.coreweave.com/gpu-cloud-pricing";
+  const html = await fetchHTML(url);
+  const gpuPatterns = [
+    { gpu: "H100", vram: 80, patterns: ["h100 sxm5", "h100 nvl", "h100"] },
+    { gpu: "H200", vram: 141, patterns: ["h200"] },
+    { gpu: "A100", vram: 80, patterns: ["a100 sxm4 80gb", "a100 80gb"] },
+    { gpu: "A100", vram: 40, patterns: ["a100 sxm4 40gb", "a100 40gb"] },
+    { gpu: "L40S", vram: 48, patterns: ["l40s"] },
+    { gpu: "RTX4090", vram: 24, patterns: ["rtx 4090", "rtx4090"] },
+    { gpu: "A40", vram: 48, patterns: ["a40"] },
+    { gpu: "V100", vram: 16, patterns: ["v100 16gb"] }
+  ];
+  return extractGPUPrices(html, gpuPatterns, url, "CoreWeave");
+}
+__name(fetchCoreWeave, "fetchCoreWeave");
+async function fetchRunPod() {
+  const apiUrl = "https://api.runpod.io/graphql";
+  try {
+    const resp = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `{
+          gpuTypes {
+            id displayName memoryInGb secureCloud communityCloud
+            lowestPrice(input: { gpuCount: 1 }) {
+              minimumBidPrice uninterruptablePrice
+            }
+          }
+        }`
+      }),
+      cf: { cacheTtl: 1800 }
+    });
+    if (!resp.ok) throw new Error(`RunPod GraphQL ${resp.status}`);
+    const data = await resp.json();
+    const gpuTypes = data?.data?.gpuTypes || [];
+    const results = [];
+    for (const gpu of gpuTypes) {
+      const gpuSpec = parseRunPodGPU(gpu.displayName);
+      if (!gpuSpec) continue;
+      const spotPrice = gpu.lowestPrice?.minimumBidPrice;
+      const odPrice = gpu.lowestPrice?.uninterruptablePrice;
+      if (odPrice) {
+        results.push({
+          id: `runpod-${gpuSpec.gpu.toLowerCase()}-${gpuSpec.vram}gb-ondemand`,
+          provider: "RunPod",
+          category: "gpu_cloud",
+          gpu: gpuSpec.gpu,
+          vram_gb: gpuSpec.vram,
+          pricing_type: "on_demand",
+          price_usd: odPrice,
+          unit: "per_gpu_hour",
+          gpu_count: 1,
+          region: "global",
+          source_url: apiUrl,
+          confidence: "high",
+          // GraphQL API = structured data
+          notes: gpu.displayName
+        });
+      }
+      if (spotPrice) {
+        results.push({
+          id: `runpod-${gpuSpec.gpu.toLowerCase()}-${gpuSpec.vram}gb-spot`,
+          provider: "RunPod",
+          category: "gpu_cloud",
+          gpu: gpuSpec.gpu,
+          vram_gb: gpuSpec.vram,
+          pricing_type: "spot",
+          price_usd: spotPrice,
+          unit: "per_gpu_hour",
+          gpu_count: 1,
+          region: "global",
+          source_url: apiUrl,
+          confidence: "high",
+          notes: `${gpu.displayName} spot/community`
+        });
+      }
+    }
+    return results;
+  } catch (err) {
+    const url = "https://www.runpod.io/gpu-instance/pricing";
+    const html = await fetchHTML(url);
+    const gpuPatterns = [
+      { gpu: "H100", vram: 80, patterns: ["h100 sxm5", "h100"] },
+      { gpu: "A100", vram: 80, patterns: ["a100 sxm4 80gb", "a100 80gb"] },
+      { gpu: "RTX4090", vram: 24, patterns: ["rtx 4090", "rtx4090"] },
+      { gpu: "RTX3090", vram: 24, patterns: ["rtx 3090", "rtx3090"] },
+      { gpu: "A40", vram: 48, patterns: ["a40"] }
+    ];
+    return extractGPUPrices(html, gpuPatterns, url, "RunPod");
+  }
+}
+__name(fetchRunPod, "fetchRunPod");
+async function fetchHTML(url) {
+  const resp = await fetch(url, {
+    headers: {
+      "User-Agent": "gpu.calc pricing bot / public data collection",
+      "Accept": "text/html,application/xhtml+xml"
+    },
+    cf: { cacheTtl: 3600 }
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
+  return await resp.text();
+}
+__name(fetchHTML, "fetchHTML");
+function extractGPUPrices(html, gpuPatterns, sourceUrl, provider) {
+  const results = [];
+  const lowerHTML = html.toLowerCase();
+  for (const spec of gpuPatterns) {
+    for (const pattern of spec.patterns) {
+      const idx = lowerHTML.indexOf(pattern.toLowerCase());
+      if (idx === -1) continue;
+      const window = html.slice(idx, idx + 1e3);
+      const priceRegex = /\$\s*(\d+(?:\.\d+)?)\s*(?:\/\s*(?:hr|hour|GPU|gpu))?/gi;
+      const matches = [];
+      let match;
+      while ((match = priceRegex.exec(window)) !== null) {
+        const price = parseFloat(match[1]);
+        if (price >= 0.5 && price <= 25) {
+          matches.push(price);
+        }
+      }
+      if (matches.length > 0) {
+        const price = matches[0];
+        results.push({
+          id: `${provider.toLowerCase()}-${spec.gpu.toLowerCase()}-${spec.vram}gb-ondemand`,
+          provider,
+          category: "gpu_cloud",
+          gpu: spec.gpu,
+          vram_gb: spec.vram,
+          pricing_type: "on_demand",
+          price_usd: price,
+          unit: "per_gpu_hour",
+          gpu_count: 1,
+          region: "global",
+          source_url: sourceUrl,
+          confidence: "medium",
+          // HTML scraping
+          notes: `Scraped from ${provider} pricing page`
+        });
+        break;
+      }
+    }
+  }
+  return results;
+}
+__name(extractGPUPrices, "extractGPUPrices");
+function parseRunPodGPU(displayName) {
+  const d = displayName.toLowerCase();
+  if (d.includes("h200")) return { gpu: "H200", vram: 141 };
+  if (d.includes("h100") && d.includes("80")) return { gpu: "H100", vram: 80 };
+  if (d.includes("h100")) return { gpu: "H100", vram: 80 };
+  if (d.includes("a100") && d.includes("80")) return { gpu: "A100", vram: 80 };
+  if (d.includes("a100")) return { gpu: "A100", vram: 40 };
+  if (d.includes("rtx 4090") || d.includes("rtx4090")) return { gpu: "RTX4090", vram: 24 };
+  if (d.includes("rtx 3090") || d.includes("rtx3090")) return { gpu: "RTX3090", vram: 24 };
+  if (d.includes("a40")) return { gpu: "A40", vram: 48 };
+  if (d.includes("a6000")) return { gpu: "A6000", vram: 48 };
+  if (d.includes("l40s")) return { gpu: "L40S", vram: 48 };
+  return null;
+}
+__name(parseRunPodGPU, "parseRunPodGPU");
+
+// src/validator.js
+var ALERT_THRESHOLD = 0.2;
+var REJECT_THRESHOLD = 0.5;
+var PRICE_RANGES = {
+  gpu_cloud: { min: 0.1, max: 50 },
+  // $/hr GPU cloud
+  api_token: { min: 1e-3, max: 500 }
+  // $/1M tokens
+};
+function validatePrices(newPrices, existingPrices) {
+  const approved = [];
+  const pending = [];
+  const rejected = [];
+  const unchanged = [];
+  const existingMap = {};
+  for (const p of existingPrices) {
+    existingMap[p.id] = p;
+  }
+  const byGPU = groupByGPU(newPrices);
+  for (const price of newPrices) {
+    const validation = validateSingle(price, existingMap[price.id], byGPU);
+    if (validation.status === "approved") approved.push({ ...price, validation });
+    if (validation.status === "pending") pending.push({ ...price, validation });
+    if (validation.status === "rejected") rejected.push({ ...price, validation });
+    if (validation.status === "unchanged") unchanged.push({ ...price, validation });
+  }
+  return { approved, pending, rejected, unchanged };
+}
+__name(validatePrices, "validatePrices");
+function validateSingle(price, existing, byGPU) {
+  const range = PRICE_RANGES[price.category];
+  if (!range) {
+    return { status: "rejected", reason: `Unknown category: ${price.category}` };
+  }
+  if (price.price_usd < range.min || price.price_usd > range.max) {
+    return {
+      status: "rejected",
+      reason: `Price $${price.price_usd} outside valid range ($${range.min}-$${range.max}) for ${price.category}`,
+      layer: "sanity"
+    };
+  }
+  if (price.gpu) {
+    const key = `${price.gpu}-${price.vram_gb}-${price.pricing_type}`;
+    const peers = (byGPU[key] || []).filter((p) => p.id !== price.id && p.price_usd > 0);
+    if (peers.length >= 2) {
+      const peerPrices = peers.map((p) => p.price_usd).sort((a, b) => a - b);
+      const median = peerPrices[Math.floor(peerPrices.length / 2)];
+      const deviation = Math.abs(price.price_usd - median) / median;
+      const isSpot = price.pricing_type === "spot" || price.pricing_type === "spot_median";
+      const rejectThreshold = isSpot ? 10 : 3;
+      const reviewThreshold = isSpot ? 3 : 1.5;
+      if (deviation > rejectThreshold) {
+        return {
+          status: "rejected",
+          reason: `Price $${price.price_usd} is ${(deviation * 100).toFixed(0)}% from peer median $${median.toFixed(2)} (${peers.length} peers)`,
+          layer: "cross_source",
+          median,
+          peers: peerPrices
+        };
+      }
+      if (deviation > reviewThreshold) {
+        return {
+          status: "pending",
+          reason: `Price $${price.price_usd} is ${(deviation * 100).toFixed(0)}% from peer median $${median.toFixed(2)} \u2014 review needed`,
+          layer: "cross_source",
+          median,
+          peers: peerPrices,
+          change_pct: deviation * 100
+        };
+      }
+    }
+  }
+  if (existing && existing.price_usd) {
+    const changePct = Math.abs(price.price_usd - existing.price_usd) / existing.price_usd;
+    if (changePct < 0.01) {
+      return {
+        status: "unchanged",
+        reason: `Price unchanged (${(changePct * 100).toFixed(2)}% delta)`,
+        layer: "drift",
+        old_price: existing.price_usd,
+        change_pct: changePct * 100
+      };
+    }
+    if (changePct > REJECT_THRESHOLD) {
+      return {
+        status: "rejected",
+        reason: `Price changed ${(changePct * 100).toFixed(0)}% from $${existing.price_usd} to $${price.price_usd} \u2014 likely parse error`,
+        layer: "drift",
+        old_price: existing.price_usd,
+        change_pct: changePct * 100
+      };
+    }
+    if (changePct > ALERT_THRESHOLD) {
+      return {
+        status: "pending",
+        reason: `Price changed ${(changePct * 100).toFixed(0)}% (from $${existing.price_usd.toFixed(2)} to $${price.price_usd.toFixed(2)}) \u2014 requires confirmation`,
+        layer: "drift",
+        old_price: existing.price_usd,
+        change_pct: changePct * 100,
+        direction: price.price_usd < existing.price_usd ? "down" : "up"
+      };
+    }
+  }
+  return {
+    status: "approved",
+    reason: existing ? "Price updated within normal range" : "New price record",
+    old_price: existing?.price_usd || null,
+    change_pct: existing ? ((price.price_usd - existing.price_usd) / existing.price_usd * 100).toFixed(1) : null
+  };
+}
+__name(validateSingle, "validateSingle");
+function groupByGPU(prices) {
+  const groups = {};
+  for (const p of prices) {
+    if (!p.gpu) continue;
+    const key = `${p.gpu}-${p.vram_gb}-${p.pricing_type}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  }
+  return groups;
+}
+__name(groupByGPU, "groupByGPU");
+function validationSummary(results) {
+  return {
+    total: results.approved.length + results.pending.length + results.rejected.length + results.unchanged.length,
+    approved: results.approved.length,
+    pending: results.pending.length,
+    rejected: results.rejected.length,
+    unchanged: results.unchanged.length,
+    pending_items: results.pending.map((p) => ({
+      id: p.id,
+      provider: p.provider,
+      gpu: p.gpu || p.model,
+      old_price: p.validation.old_price,
+      new_price: p.price_usd,
+      change_pct: p.validation.change_pct,
+      reason: p.validation.reason
+    })),
+    rejected_items: results.rejected.map((p) => ({
+      id: p.id,
+      price: p.price_usd,
+      reason: p.validation.reason
+    }))
+  };
+}
+__name(validationSummary, "validationSummary");
+
+// src/index.js
+init_storage();
+var CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
+  "Content-Type": "application/json"
+};
+var index_default = {
+  // HTTP requests
+  async fetch(request, env) {
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: CORS_HEADERS });
+    }
+    const url = new URL(request.url);
+    const path = url.pathname;
+    try {
+      if (path === "/prices" && request.method === "GET") {
+        return handleGetPrices(request, env);
+      }
+      if (path.match(/^\/prices\/(.+)\/history$/) && request.method === "GET") {
+        const priceId = path.match(/^\/prices\/(.+)\/history$/)[1];
+        return handleGetHistory(priceId, url, env);
+      }
+      if (path === "/diff" && request.method === "GET") {
+        return handleGetDiff(url, env);
+      }
+      if (path === "/status" && request.method === "GET") {
+        return handleGetStatus(env);
+      }
+      if (path === "/run" && request.method === "POST") {
+        return handleRun(request, url, env);
+      }
+      if (path === "/validate" && request.method === "GET") {
+        return handleGetValidate(request, env);
+      }
+      if (path.match(/^\/validate\/(\d+)$/) && request.method === "POST") {
+        const alertId = path.match(/^\/validate\/(\d+)$/)[1];
+        return handleResolveAlert(alertId, request, env);
+      }
+      return json({ error: "Not found" }, 404);
+    } catch (err) {
+      console.error("Worker error:", err);
+      return json({ error: "Internal server error", message: err.message }, 500);
+    }
+  },
+  // Cron trigger — biweekly automated collection
+  async scheduled(event, env) {
+    console.log("Cron triggered:", event.cron);
+    await runCollection(env, "cron", "all");
+  }
+};
+async function handleGetPrices(request, env) {
+  const url = new URL(request.url);
+  const filters = {
+    category: url.searchParams.get("category") || null,
+    gpu: url.searchParams.get("gpu") || null,
+    provider: url.searchParams.get("provider") || null,
+    pricing_type: url.searchParams.get("pricing_type") || null,
+    confidence: url.searchParams.get("confidence") || null
+  };
+  Object.keys(filters).forEach((k) => {
+    if (!filters[k]) delete filters[k];
+  });
+  const { prices, source } = await getPrices(env.DB, env.PRICE_CACHE, filters);
+  return json({
+    prices,
+    count: prices.length,
+    source,
+    // 'cache' or 'db'
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    filters_applied: Object.keys(filters)
+  });
+}
+__name(handleGetPrices, "handleGetPrices");
+async function handleGetHistory(priceId, url, env) {
+  const days = parseInt(url.searchParams.get("days") || "90");
+  const { getPriceHistory: getHistory } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+  const history = await getPriceHistory(env.DB, decodeURIComponent(priceId), days);
+  return json({ price_id: priceId, history, days });
+}
+__name(handleGetHistory, "handleGetHistory");
+async function handleGetDiff(url, env) {
+  const since = url.searchParams.get("since") || "7d";
+  const hours = parseDuration(since);
+  const diffs = await getPriceDiff(env.DB, hours);
+  return json({
+    since,
+    changes: diffs,
+    count: diffs.length,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+__name(handleGetDiff, "handleGetDiff");
+async function handleGetStatus(env) {
+  const runs = await getRunHistory(env.DB, 5);
+  const { prices } = await getPrices(env.DB, env.PRICE_CACHE, {});
+  const pending = await getPendingAlerts(env.DB);
+  const bySource = {};
+  for (const p of prices) {
+    if (!bySource[p.provider]) bySource[p.provider] = { count: 0, confidence: p.confidence };
+    bySource[p.provider].count++;
+  }
+  return json({
+    status: "ok",
+    prices_total: prices.length,
+    prices_by_source: bySource,
+    pending_review: pending.length,
+    last_run: runs[0] || null,
+    recent_runs: runs,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString()
+  });
+}
+__name(handleGetStatus, "handleGetStatus");
+async function handleRun(request, url, env) {
+  if (!isAdmin(request, env)) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+  const sourcesParam = url.searchParams.get("sources") || "all";
+  const runId = crypto.randomUUID();
+  const result = await runCollection(env, "manual", sourcesParam, runId);
+  return json(result);
+}
+__name(handleRun, "handleRun");
+async function handleGetValidate(request, env) {
+  if (!isAdmin(request, env)) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+  const alerts = await getPendingAlerts(env.DB);
+  return json({ pending_count: alerts.length, alerts });
+}
+__name(handleGetValidate, "handleGetValidate");
+async function handleResolveAlert(alertId, request, env) {
+  if (!isAdmin(request, env)) {
+    return json({ error: "Unauthorized" }, 401);
+  }
+  const body = await request.json().catch(() => ({}));
+  const action = body.action;
+  if (!["confirm", "reject"].includes(action)) {
+    return json({ error: "action must be confirm or reject" }, 400);
+  }
+  const result = await resolveAlert(env.DB, env.PRICE_CACHE, alertId, action);
+  return json(result);
+}
+__name(handleResolveAlert, "handleResolveAlert");
+async function runCollection(env, trigger, sourcesArg, runId) {
+  runId = runId || crypto.randomUUID();
+  const startedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const allSources = ["aws", "gcp", "azure", "vastai", "api_tokens", "specialists"];
+  const sources = sourcesArg === "all" ? allSources : sourcesArg.split(",").filter((s) => allSources.includes(s));
+  await saveRun(env.DB, { id: runId, trigger, sources, started_at: startedAt });
+  const allNew = [];
+  const allErrors = [];
+  const collectorMap = {
+    aws: collectAWS,
+    gcp: collectGCP,
+    azure: collectAzure,
+    vastai: collectVastAI,
+    api_tokens: collectAPITokens,
+    specialists: collectSpecialists
+  };
+  const BATCH_SIZE = 2;
+  for (let i = 0; i < sources.length; i += BATCH_SIZE) {
+    const batch = sources.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (source) => {
+      const collector = collectorMap[source];
+      if (!collector) return;
+      console.log(`Running collector: ${source}`);
+      try {
+        const { results, errors } = await collector();
+        allNew.push(...results);
+        allErrors.push(...errors || []);
+        console.log(`${source}: ${results.length} prices, ${errors?.length || 0} errors`);
+      } catch (err) {
+        console.error(`Collector ${source} failed:`, err.message);
+        allErrors.push({ source, error: err.message, fatal: true });
+      }
+    });
+    await Promise.all(batchPromises);
+  }
+  const { prices: existingPrices } = await getPrices(env.DB, env.PRICE_CACHE, {});
+  const validated = validatePrices(allNew, existingPrices);
+  const summary = validationSummary(validated);
+  console.log("Validation summary:", JSON.stringify(summary));
+  const savedIds = await savePrices(env.DB, env.PRICE_CACHE, validated, runId);
+  if (validated.pending.length > 0 && env.SLACK_WEBHOOK) {
+    await sendSlackAlert(env.SLACK_WEBHOOK, validated.pending, runId);
+  }
+  await completeRun(env.DB, runId, {
+    fetched: allNew.length,
+    updated: savedIds.length,
+    pending: validated.pending.length,
+    errors: allErrors
+  });
+  return {
+    run_id: runId,
+    status: "completed",
+    sources_run: sources,
+    prices_fetched: allNew.length,
+    prices_approved: validated.approved.length,
+    prices_pending: validated.pending.length,
+    prices_rejected: validated.rejected.length,
+    prices_unchanged: validated.unchanged.length,
+    errors: allErrors.length,
+    error_details: allErrors,
+    pending_items: summary.pending_items,
+    duration_ms: Date.now() - new Date(startedAt).getTime()
+  };
+}
+__name(runCollection, "runCollection");
+function isAdmin(request, env) {
+  const token = request.headers.get("X-Admin-Token");
+  return token && token === env.ADMIN_SECRET;
+}
+__name(isAdmin, "isAdmin");
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: CORS_HEADERS
+  });
+}
+__name(json, "json");
+function parseDuration(str) {
+  const match = str.match(/^(\d+)(d|h)$/);
+  if (!match) return 7 * 24;
+  const n = parseInt(match[1]);
+  return match[2] === "d" ? n * 24 : n;
+}
+__name(parseDuration, "parseDuration");
+async function sendSlackAlert(webhookUrl, pendingPrices, runId) {
+  const lines = pendingPrices.slice(0, 5).map((p) => {
+    const direction = p.price_usd < (p.validation.old_price || 0) ? "\u{1F4C9}" : "\u{1F4C8}";
+    return `${direction} *${p.provider}* ${p.gpu || p.model}: $${p.validation.old_price?.toFixed(2)} \u2192 $${p.price_usd.toFixed(2)} (${p.validation.change_pct?.toFixed(0)}%)`;
+  });
+  const more = pendingPrices.length > 5 ? `
+_...and ${pendingPrices.length - 5} more_` : "";
+  await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: `\u{1F6A8} *gpu.calc pricing: ${pendingPrices.length} price change(s) need review*
+Run ID: \`${runId}\`
+
+${lines.join("\n")}${more}
+
+Review at: \`GET /validate\` with your admin token`
+    })
+  });
+}
+__name(sendSlackAlert, "sendSlackAlert");
+export {
+  index_default as default
+};
+//# sourceMappingURL=index.js.map

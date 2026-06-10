@@ -1,88 +1,128 @@
+// GPU Catalog - Hardware specifications
+// Source: gpu-catalog.json (converted from docs/gpu-data)
+
+import gpuCatalogJson from './gpu-catalog.json'
+
 export interface GpuSpec {
-  id:                    string
-  name:                  string
-  vramGb:                number
-  memoryBandwidthGbps:   number   // HBM bandwidth
-  bandwidthTbps:         number   // kept for backward compatibility (= memoryBandwidthGbps / 1000)
-  tflops:                number   // BF16 TFLOPS
-  pricePerHour:          number   // cloud on-demand USD/hr
-  hardwareCostPerGpu:    number   // on-prem purchase price USD
-  powerWatts:            number   // TDP
-  cloudAvailabilityPct:  number
-  tpuAvailabilityPct:    number
+  // New JSON schema fields (from gpu-catalog.json)
+  id: string
+  name: string
+  vendor: 'nvidia' | 'amd'
+  vram_gb: number
+  hardware_cost_usd: number
+  memory_bandwidth_tbps: number
+  tokens_per_dollar: number
+  tflops_bf16: number
+  tflops_fp8: number | null
+  mfu_prefill: number  // Model FLOPs Utilization for prefill (compute-bound)
+  mfu_decode: number   // Memory bandwidth utilization for decode
+  tdp_watts: number
+  architecture: 'ampere' | 'hopper' | 'blackwell' | 'ada' | 'cdna2' | 'cdna3' | 'cdna4'
+  nvlink_bandwidth_gbps?: number
+  color: string  // Hex color for visualization
+
+  // Legacy field names (backward compatibility - computed at runtime)
+  vramGb: number
+  memoryBandwidthGbps: number
+  bandwidthTbps: number
+  tflops: number
+  pricePerHour: number
+  hardwareCostPerGpu: number
+  powerWatts: number
+  cloudAvailabilityPct: number
+  tpuAvailabilityPct: number
+
+  // Live pricing from Cloudflare Worker (optional - populated at runtime)
+  livePricing?: {
+    onDemand?: {
+      min: number | null
+      median: number | null
+      max: number | null
+      count: number
+      providers: Array<{ provider: string; price_per_gpu: number; region: string }>
+    }
+    spot?: {
+      min: number | null
+      median: number | null
+      max: number | null
+      count: number
+      providers: Array<{ provider: string; price_per_gpu: number; region: string }>
+    }
+    lastUpdated: string
+  }
 }
 
-export const GPU_CATALOG: GpuSpec[] = [
-  {
-    id: 'h100-sxm-80gb',
-    name: 'H100 SXM 80 GB',
-    vramGb: 80, memoryBandwidthGbps: 3350, bandwidthTbps: 3.35,
-    tflops: 989, pricePerHour: 6.00, hardwareCostPerGpu: 30_000,
-    powerWatts: 700, cloudAvailabilityPct: 7, tpuAvailabilityPct: 92,
-  },
-  {
-    id: 'h100-pcie-80gb',
-    name: 'H100 PCIe 80 GB',
-    vramGb: 80, memoryBandwidthGbps: 2000, bandwidthTbps: 2.0,
-    tflops: 756, pricePerHour: 4.50, hardwareCostPerGpu: 25_000,
-    powerWatts: 350, cloudAvailabilityPct: 15, tpuAvailabilityPct: 80,
-  },
-  {
-    id: 'h200-sxm-141gb',
-    name: 'H200 SXM 141 GB',
-    vramGb: 141, memoryBandwidthGbps: 4800, bandwidthTbps: 4.8,
-    tflops: 989, pricePerHour: 10.00, hardwareCostPerGpu: 50_000,
-    powerWatts: 700, cloudAvailabilityPct: 5, tpuAvailabilityPct: 95,
-  },
-  {
-    id: 'a100-sxm-80gb',
-    name: 'A100 SXM 80 GB',
-    vramGb: 80, memoryBandwidthGbps: 2000, bandwidthTbps: 2.0,
-    tflops: 312, pricePerHour: 3.20, hardwareCostPerGpu: 15_000,
-    powerWatts: 400, cloudAvailabilityPct: 35, tpuAvailabilityPct: 78,
-  },
-  {
-    id: 'a100-pcie-80gb',
-    name: 'A100 PCIe 80 GB',
-    vramGb: 80, memoryBandwidthGbps: 1935, bandwidthTbps: 1.935,
-    tflops: 312, pricePerHour: 2.80, hardwareCostPerGpu: 12_000,
-    powerWatts: 300, cloudAvailabilityPct: 40, tpuAvailabilityPct: 75,
-  },
-  {
-    id: 'l40s-48gb',
-    name: 'L40S 48 GB',
-    vramGb: 48, memoryBandwidthGbps: 864, bandwidthTbps: 0.864,
-    tflops: 733, pricePerHour: 2.50, hardwareCostPerGpu: 12_000,
-    powerWatts: 350, cloudAvailabilityPct: 52, tpuAvailabilityPct: 70,
-  },
-  {
-    id: 'mi300x-192gb',
-    name: 'AMD MI300X 192 GB',
-    vramGb: 192, memoryBandwidthGbps: 5300, bandwidthTbps: 5.3,
-    tflops: 1307, pricePerHour: 8.00, hardwareCostPerGpu: 20_000,
-    powerWatts: 750, cloudAvailabilityPct: 10, tpuAvailabilityPct: 50,
-  },
-  {
-    id: 'mi325x-256gb',
-    name: 'AMD MI325X 256 GB',
-    vramGb: 256, memoryBandwidthGbps: 6000, bandwidthTbps: 6.0,
-    tflops: 1307, pricePerHour: 10.00, hardwareCostPerGpu: 25_000,
-    powerWatts: 750, cloudAvailabilityPct: 5, tpuAvailabilityPct: 40,
-  },
-  {
-    id: 'b200-sxm-192gb',
-    name: 'B200 SXM 192 GB',
-    vramGb: 192, memoryBandwidthGbps: 8000, bandwidthTbps: 8.0,
-    tflops: 2250, pricePerHour: 15.00, hardwareCostPerGpu: 60_000,
-    powerWatts: 1000, cloudAvailabilityPct: 2, tpuAvailabilityPct: 98,
-  },
-  {
-    id: 'rtx-4090-24gb',
-    name: 'RTX 4090 24 GB',
-    vramGb: 24, memoryBandwidthGbps: 1008, bandwidthTbps: 1.008,
-    tflops: 330, pricePerHour: 0.80, hardwareCostPerGpu: 2_000,
-    powerWatts: 450, cloudAvailabilityPct: 60, tpuAvailabilityPct: 20,
-  },
-]
+// Load GPU catalog from JSON and add computed fields
+const rawGpuCatalog: GpuSpec[] = gpuCatalogJson as GpuSpec[]
 
-export const DEFAULT_GPU = GPU_CATALOG[0]  // H100 SXM 80 GB
+// Export with both new and legacy field names for backward compatibility
+export const GPU_CATALOG = rawGpuCatalog.map(gpu => ({
+  // New JSON schema fields
+  ...gpu,
+
+  // Legacy field names (for backward compatibility)
+  vramGb: gpu.vram_gb,
+  memoryBandwidthGbps: gpu.memory_bandwidth_tbps * 1000,
+  bandwidthTbps: gpu.memory_bandwidth_tbps,
+  tflops: gpu.tflops_bf16,
+  pricePerHour: 0, // Will be populated from Cloudflare Worker live pricing
+  hardwareCostPerGpu: gpu.hardware_cost_usd,
+  powerWatts: gpu.tdp_watts,
+  cloudAvailabilityPct: 0, // Deprecated - use Cloudflare Worker
+  tpuAvailabilityPct: 0    // Deprecated
+}))
+
+// Helper: Get GPU by ID
+export function getGpuById(id: string): GpuSpec | undefined {
+  return GPU_CATALOG.find(gpu => gpu.id === id)
+}
+
+// Helper: Get GPUs by vendor
+export function getGpusByVendor(vendor: 'nvidia' | 'amd'): GpuSpec[] {
+  return GPU_CATALOG.filter(gpu => gpu.vendor === vendor)
+}
+
+// Helper: Get GPUs by architecture
+export function getGpusByArchitecture(arch: string): GpuSpec[] {
+  return GPU_CATALOG.filter(gpu => gpu.architecture === arch)
+}
+
+// Helper: Get GPUs with minimum VRAM
+export function getGpusByMinVram(minVram: number): GpuSpec[] {
+  return GPU_CATALOG.filter(gpu => gpu.vram_gb >= minVram)
+}
+
+// Default GPU for initial state
+export const DEFAULT_GPU = GPU_CATALOG.find(gpu => gpu.id === 'h100-80gb') || GPU_CATALOG[0]
+
+// Backward compatibility - map new JSON schema to old API response format
+export interface GpuSpecLegacy {
+  id: string
+  name: string
+  vramGb: number
+  memoryBandwidthGbps: number
+  bandwidthTbps: number
+  tflops: number
+  pricePerHour: number
+  hardwareCostPerGpu: number
+  powerWatts: number
+  cloudAvailabilityPct: number
+  tpuAvailabilityPct: number
+}
+
+// Convert new GPU spec to legacy format for backward compatibility
+export function toLegacyFormat(gpu: GpuSpec): GpuSpecLegacy {
+  return {
+    id: gpu.id,
+    name: gpu.name,
+    vramGb: gpu.vram_gb,
+    memoryBandwidthGbps: gpu.memory_bandwidth_tbps * 1000,
+    bandwidthTbps: gpu.memory_bandwidth_tbps,
+    tflops: gpu.tflops_bf16,
+    pricePerHour: 0, // Will be populated from Cloudflare Worker live pricing
+    hardwareCostPerGpu: gpu.hardware_cost_usd,
+    powerWatts: gpu.tdp_watts,
+    cloudAvailabilityPct: 0, // Deprecated - use Cloudflare Worker for availability
+    tpuAvailabilityPct: 0
+  }
+}

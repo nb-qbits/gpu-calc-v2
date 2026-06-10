@@ -1,0 +1,23 @@
+var GPU_DATA = [
+  // tflops_bf16: dense BF16 TFLOPS (official spec, non-sparse)
+  // tflops_fp8:  dense FP8 TFLOPS
+  // mfu_prefill: practical MFU for compute-bound prefill (from benchmarks)
+  // mfu_bw:      practical memory bandwidth utilisation for decode
+  // tdp_w:       thermal design power watts
+  // arch:        microarchitecture family
+  {name:'A100',     vendor:'nvidia', vram:40,  price:10000, mem_bw:1.56, tpp:6000,  col:'#7ab3e0', tflops_bf16:312,  tflops_fp8:null, mfu_prefill:0.45, mfu_bw:0.87, tdp_w:400,  arch:'ampere'},
+  {name:'A100 80GB',vendor:'nvidia', vram:80,  price:15000, mem_bw:2.0,  tpp:10500, col:'#7ab3e0', tflops_bf16:312,  tflops_fp8:null, mfu_prefill:0.45, mfu_bw:0.87, tdp_w:400,  arch:'ampere'},
+  {name:'H100',     vendor:'nvidia', vram:80,  price:25000, mem_bw:3.35, tpp:18000, col:'#5b9bd5', tflops_bf16:989,  tflops_fp8:1979, mfu_prefill:0.38, mfu_bw:0.87, tdp_w:700,  arch:'hopper'},
+  {name:'H200',     vendor:'nvidia', vram:141, price:32000, mem_bw:4.8,  tpp:25000, col:'#5b9bd5', tflops_bf16:989,  tflops_fp8:1979, mfu_prefill:0.38, mfu_bw:0.87, tdp_w:700,  arch:'hopper'},
+  {name:'H20',      vendor:'nvidia', vram:96,  price:12000, mem_bw:4.0,  tpp:7000,  col:'#6aa8dc', tflops_bf16:148,  tflops_fp8:296,  mfu_prefill:0.35, mfu_bw:0.85, tdp_w:500,  arch:'hopper', nvlink_bw_GBs:0},
+  {name:'B100',     vendor:'nvidia', vram:192, price:35000, mem_bw:8.0,  tpp:28000, col:'#4285c8', tflops_bf16:1750, tflops_fp8:3500, mfu_prefill:0.42, mfu_bw:0.85, tdp_w:700,  arch:'blackwell'},
+  {name:'B200',     vendor:'nvidia', vram:192, price:45000, mem_bw:8.0,  tpp:40000, col:'#3575bc', tflops_bf16:2250, tflops_fp8:4500, mfu_prefill:0.44, mfu_bw:0.85, tdp_w:1000, arch:'blackwell'},
+  {name:'B300',     vendor:'nvidia', vram:288, price:60000, mem_bw:10.0, tpp:60000, col:'#2866b0', tflops_bf16:3000, tflops_fp8:6000, mfu_prefill:0.44, mfu_bw:0.83, tdp_w:1400, arch:'blackwell'},
+  {name:'B30A',     vendor:'nvidia', vram:120, price:20000, mem_bw:4.0,  tpp:18000, col:'#4d8fd4', tflops_bf16:1500, tflops_fp8:3000, mfu_prefill:0.40, mfu_bw:0.83, tdp_w:600,  arch:'blackwell'},
+  {name:'L40S',     vendor:'nvidia', vram:48,  price:14000, mem_bw:0.864,tpp:8000,  col:'#7ab3e0', tflops_bf16:733,  tflops_fp8:1457, mfu_prefill:0.35, mfu_bw:0.82, tdp_w:350,  arch:'ada'},
+  {name:'MI250X',   vendor:'amd',    vram:128, price:15000, mem_bw:3.2,  tpp:9000,  col:'#e07878', tflops_bf16:383,  tflops_fp8:null, mfu_prefill:0.22, mfu_bw:0.78, tdp_w:560,  arch:'cdna2'},
+  {name:'MI300X',   vendor:'amd',    vram:192, price:25000, mem_bw:5.3,  tpp:22000, col:'#cc4444', tflops_bf16:1307, tflops_fp8:2615, mfu_prefill:0.20, mfu_bw:0.78, tdp_w:750,  arch:'cdna3'},
+  {name:'MI325X',   vendor:'amd',    vram:256, price:30000, mem_bw:6.0,  tpp:25000, col:'#c03838', tflops_bf16:1307, tflops_fp8:2615, mfu_prefill:0.20, mfu_bw:0.78, tdp_w:750,  arch:'cdna3'},
+  {name:'MI350X',   vendor:'amd',    vram:288, price:40000, mem_bw:8.0,  tpp:34000, col:'#b42020', tflops_bf16:2600, tflops_fp8:4600, mfu_prefill:0.25, mfu_bw:0.80, tdp_w:950,  arch:'cdna4'},
+  {name:'MI300A',   vendor:'amd',    vram:128, price:20000, mem_bw:5.2,  tpp:18000, col:'#d96060', tflops_bf16:1307, tflops_fp8:2615, mfu_prefill:0.20, mfu_bw:0.78, tdp_w:760,  arch:'cdna3'},
+];

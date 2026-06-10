@@ -20,7 +20,10 @@ import "@patternfly/react-styles/css/components/Tile/tile.css";
 import "@patternfly/react-styles/css/components/ToggleGroup/toggle-group.css";
 import "@patternfly/react-styles/css/components/DescriptionList/description-list.css";
 import "@patternfly/react-styles/css/components/Form/form.css";
+import "@patternfly/react-styles/css/components/Label/label.css";
+import "@patternfly/react-styles/css/components/Switch/switch.css";
 import "./globals.css";
+import "./theme.css";
 import { AppShell } from "@/components/layout/AppShell";
 
 const redHatDisplay = Red_Hat_Display({
@@ -57,6 +60,14 @@ export default function RootLayout({
       lang="en"
       className={`${redHatDisplay.variable} ${redHatText.variable} ${redHatMono.variable}`}
     >
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body>
         <AppShell>{children}</AppShell>
       </body>

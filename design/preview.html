@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quick Estimate — reference preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Reference preview — mirrors QuickEstimate.tsx + .module.css visually.
+     Standalone (no PatternFly) so it renders anywhere. Class names match the
+     module so this doubles as a visual spec for Claude Code. */
+  :root{
+    --t:#151515;--t2:#3c3f42;--t3:#54585c;--bg:#fff;--bg2:#f5f5f5;--bg3:#e0e0e0;
+    --line:#d2d2d2;--line2:#b8bbbe;--blue:#0066cc;--red:#ee0000;
+    --amber-bg:#fdf7e7;--amber-line:#f0ab00;--ok:#3d7317;--watch:#795600;--bottleneck:#c9190b;
+    --c-cyan:#009596;--c-purple:#5752d1;--c-orange:#ec7a08;
+    --chart1:#06c;--chart2:#009596;--chart3:#5752d1;
+    --display:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;
+    --sans:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;--radius:6px;
+    --num-weight:700;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg2);font-family:var(--sans);color:var(--t);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+  .shell{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+  .side{background:#151515;color:#fff;padding:0}
+  .side .logo{display:flex;align-items:center;gap:9px;padding:16px 18px;font-family:var(--display);font-weight:700;font-size:18px}
+  .side .logo .mk{width:24px;height:19px}
+  .side .logo em{font-style:normal;color:var(--red)}
+  .side a{display:block;color:rgba(255,255,255,.78);text-decoration:none;padding:10px 18px;font-size:14px;font-weight:500}
+  .side a.sub{padding-left:34px;font-size:13.5px;color:rgba(255,255,255,.62)}
+  .side a.active{background:#2b2b2b;color:#fff;box-shadow:inset 3px 0 0 var(--red)}
+  .side .grp{padding:14px 18px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.4);font-family:var(--mono)}
+  .main{padding:24px 32px 80px;overflow:auto}
+  .page{max-width:1600px;margin:0 auto}
+
+  .pageTitle{font-family:var(--display);font-size:30px;font-weight:var(--num-weight);letter-spacing:-.01em;margin:8px 0 4px}
+  .subtitle{font-size:15px;color:var(--t2);margin:0}
+  .bc{font-size:13px;color:var(--t2);font-family:var(--sans)}
+  .bc .sep{color:var(--t3);margin:0 6px}
+  .headRow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .star{background:none;border:0;cursor:pointer;color:var(--t3);font-size:20px;padding:6px}
+
+  .card{background:var(--bg);border:1px solid var(--line);border-radius:var(--radius)}
+  .cardHead{display:flex;align-items:center;gap:10px;padding:18px 20px 0;flex-wrap:wrap}
+  .cardTitle{font-family:var(--display);font-size:17px;font-weight:600;white-space:nowrap}
+  .cardHint{font-size:13px;color:var(--t2)}
+  .cardBody{padding:16px 20px 20px}
+  .qmark{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--line2);color:var(--t3);align-items:center;justify-content:center;font-size:10px;font-family:var(--mono);cursor:help;vertical-align:middle}
+  .qmark:hover{color:var(--blue);border-color:var(--blue)}
+
+  .inputCard{padding:18px 20px;margin:16px 0}
+  .inputRow{display:grid;grid-template-columns:minmax(280px,1.4fr) minmax(200px,1fr) auto;gap:16px;align-items:end}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .fieldLabel{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--t2)}
+  .fieldRow{display:flex;align-items:center;gap:8px}
+  .inp{padding:7px 11px;border:1px solid var(--line2);border-radius:4px;font-family:var(--sans);font-size:14px;width:100%;color:var(--t)}
+  .inp:focus{outline:2px solid var(--blue);outline-offset:-1px;border-color:var(--blue)}
+  .sel{padding:7px 11px;border:1px solid var(--line2);border-radius:4px;font-size:14px;background:#fff;width:100%;color:var(--t)}
+  .chipGreen{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-size:12px;font-weight:600;color:var(--ok);background:#f3faf0;border:1px solid #c8e6b8;border-radius:20px;padding:3px 10px}
+  .btn{font-family:var(--sans);font-weight:600;font-size:14px;border:0;border-radius:4px;padding:9px 18px;cursor:pointer}
+  .btnPri{background:var(--blue);color:#fff}
+  .btnPri:hover{background:#004d99}
+  .btnSec{background:#fff;color:var(--blue);border:1px solid var(--blue)}
+  .btnLink{background:none;border:0;color:var(--blue);cursor:pointer;font-size:14px;font-weight:600;padding:0}
+  .switchRow{margin-top:12px;display:flex;align-items:center;gap:10px;font-size:14px}
+  .sw{width:34px;height:20px;border-radius:20px;background:var(--bg3);position:relative;cursor:pointer;flex-shrink:0}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
+
+  .warn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;margin-bottom:20px;background:var(--amber-bg);border:1px solid var(--amber-line);border-left-width:4px;border-radius:var(--radius);font-size:14px}
+  .warn .ic{color:#b98412;flex-shrink:0;font-size:16px}
+
+  .tilesGrid{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:14px;margin-bottom:20px}
+  .flip{perspective:1100px;cursor:pointer;min-height:158px;position:relative}
+  .flipFace{position:absolute;inset:0;border:1px solid var(--line);border-radius:var(--radius);background:#fff;padding:18px 18px 14px;transition:opacity .25s,transform .5s cubic-bezier(.4,.8,.4,1);backface-visibility:hidden;display:flex;flex-direction:column}
+  .flipFront{opacity:1;transform:rotateY(0)}
+  .flipBack{opacity:0;transform:rotateY(180deg);pointer-events:none}
+  .flip.flipped .flipFront{opacity:0;transform:rotateY(-180deg);pointer-events:none}
+  .flip.flipped .flipBack{opacity:1;transform:rotateY(0)}
+  .tileDark .flipFront{background:#151515;border-color:#151515;color:#fff}
+  .tileDark .flipBack{background:#1f1f1f;border-color:#1f1f1f;color:#fff}
+  .tileLabel{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--t2);display:flex;align-items:center;gap:7px}
+  .tileDark .tileLabel{color:rgba(255,255,255,.82)}
+  .tileValue{font-family:var(--display);font-weight:var(--num-weight);letter-spacing:-.01em;line-height:1;margin-top:auto;font-size:40px}
+  .tileDark .tileValue{font-size:60px}
+  .tileUnit{font-family:var(--display);font-size:.42em;font-weight:600;color:var(--t3);margin-left:6px}
+  .tileDark .tileUnit{color:rgba(255,255,255,.7)}
+  .tileSub{font-size:13px;color:var(--t2);margin-top:10px}
+  .tileDark .tileSub{color:rgba(255,255,255,.78)}
+  .gqaChip{display:inline-block;font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--c-purple);background:rgba(87,82,209,.12);padding:2px 7px;border-radius:4px;margin-top:8px}
+  .spark{position:absolute;top:16px;right:16px}
+  .seeMath{margin-top:auto;padding-top:10px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;color:var(--t3);display:inline-flex;align-items:center;gap:5px}
+  .tileDark .seeMath{color:rgba(255,255,255,.6)}
+  .flip:hover .seeMath{color:var(--blue)}
+  .tileDark:hover .seeMath{color:#fff}
+  .backTitle{font-family:var(--mono);font-size:11.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:10px}
+  .tileDark .backTitle{color:rgba(255,255,255,.6)}
+  .formula{font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--t)}
+  .tileDark .formula{color:#fff}
+  .formula .em{color:var(--blue);font-weight:600}
+  .tileDark .formula .em{color:#7cc4ff}
+
+  .twoCol{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .scenRow{display:grid;grid-template-columns:1fr 1fr 1fr}
+  .scen{padding:4px 18px;border-left:3px solid var(--line)}
+  .scen:first-child{padding-left:4px}
+  .scenCyan{border-left-color:var(--c-cyan)}.scenPurple{border-left-color:var(--c-purple)}.scenOrange{border-left-color:var(--c-orange)}
+  .scenLabel{font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--t2);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+  .scenValue{font-family:var(--display);font-size:28px;font-weight:var(--num-weight);letter-spacing:-.01em;line-height:1}
+  .vCyan{color:var(--c-cyan)}.vPurple{color:var(--c-purple)}.vOrange{color:var(--c-orange)}
+  .scenUnit{font-size:14px;font-weight:600;color:var(--t3);margin-left:4px}
+  .scenSub{font-size:13px;color:var(--t2);margin-top:8px}
+  .insight{margin:16px 20px 0;padding:12px 14px;background:var(--bg2);border-left:3px solid var(--blue);border-radius:var(--radius);font-size:14px;color:var(--t2);display:flex;align-items:center;gap:8px}
+  .insight .ic{color:var(--blue);flex-shrink:0;font-size:15px}
+  .insight strong{color:var(--t)}
+
+  .constraint{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .constraint:last-of-type{border-bottom:0}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .dOk{background:var(--ok)}.dWatch{background:var(--watch)}.dBot{background:var(--bottleneck)}
+  .conLabel{font-size:14px;color:var(--t);font-weight:500;flex:1;display:flex;align-items:center;gap:6px}
+  .conDetail{font-family:var(--mono);font-size:13px;color:var(--t2);white-space:nowrap}
+  .pill{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:10px}
+  .pOk{color:var(--ok);background:rgba(61,115,23,.12)}.pWatch{color:var(--watch);background:rgba(121,86,0,.14)}.pBot{color:var(--bottleneck);background:rgba(201,25,11,.12)}
+  .botNote{margin-top:14px;font-size:13px;color:var(--t2)}.botNote strong{color:var(--t)}
+
+  .driver{display:grid;grid-template-columns:auto 1fr auto;gap:12px 14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+  .driver:last-of-type{border-bottom:0}
+  .rank{width:24px;height:24px;border-radius:50%;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--t2)}
+  .dName{font-size:14px;color:var(--t);font-weight:600}
+  .dReason{font-size:13px;color:var(--t2);margin-top:3px;line-height:1.45}
+  .dRange{font-family:var(--mono);font-size:12.5px;color:var(--t2);white-space:nowrap}
+  .barTrack{grid-column:2/3;height:6px;border-radius:3px;background:var(--bg3);overflow:hidden}
+  .barFill{height:100%;border-radius:3px;background:var(--blue)}
+
+  .memBar{display:flex;height:30px;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+  .memLegend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:14px}
+  .memLeg{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--t2)}
+  .memSw{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+  .memLeg strong{color:var(--t);font-family:var(--mono);font-weight:600}
+
+  .aHead{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:4px 0 6px;flex-wrap:wrap}
+  .aTitle{font-family:var(--display);font-size:20px;font-weight:600}
+  .aSub{font-size:14px;color:var(--t2);margin:0 0 12px}
+  .acc{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:8px;background:#fff;overflow:hidden}
+  .accTog{width:100%;display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding:14px 18px;background:none;border:0;cursor:pointer;text-align:left}
+  .accTog:hover{background:var(--bg2)}
+  .accCaret{color:var(--t3);transition:transform .2s;font-size:12px}
+  .acc.open .accCaret{transform:rotate(90deg)}
+  .accSummary{font-family:var(--mono);font-size:13px;color:var(--t2);display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;flex-basis:100%;margin-left:26px;margin-top:2px}
+  .accSummary>span{white-space:nowrap}
+  .accSummary .k{color:var(--t3)}
+  .badge{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:4px}
+  .bAdv{color:var(--c-orange);background:rgba(236,122,8,.12)}.bAuto{color:var(--blue);background:rgba(0,102,204,.1)}
+  .accBody{padding:6px 18px 18px;display:none}
+  .acc.open .accBody{display:block}
+  .accGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 20px}
+  .accField{display:flex;flex-direction:column;gap:6px}
+  .accFieldLabel{font-size:13px;color:var(--t);font-weight:500;display:flex;align-items:center;gap:6px}
+
+  .footerRow{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px;align-items:center}
+  .spacer{flex:1}
+  .apiBody{font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--t2);background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;overflow-x:auto;white-space:pre;margin:12px 0 0}
+
+  @media(max-width:1100px){.tilesGrid{grid-template-columns:1fr 1fr}.twoCol{grid-template-columns:1fr}}
+  @media(max-width:820px){.shell{grid-template-columns:1fr}.side{display:none}.accGrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="logo">
+      <svg class="mk" viewBox="0 0 36 28" fill="none"><ellipse cx="18" cy="21" rx="17" ry="3" fill="#ee0000"/><path d="M4 21 C6 11,11 5,18 5 C25 5,30 11,32 21Z" fill="#ee0000"/></svg>
+      <span>gpu<em>calc</em></span>
+    </div>
+    <div class="grp">Estimate</div>
+    <a class="sub active">Quick estimate</a>
+    <a class="sub">Advanced estimate</a>
+    <a class="sub">Model explorer</a>
+    <a class="sub">History</a>
+    <div class="grp">Optimize</div>
+    <a class="sub">Hybrid savings</a>
+    <a class="sub">Routing</a>
+    <div class="grp">System</div>
+    <a class="sub">Settings</a>
+  </aside>
+
+  <main class="main">
+  <div class="page">
+    <div class="bc">Estimate <span class="sep">/</span> Quick estimate</div>
+    <div class="headRow">
+      <div>
+        <h1 class="pageTitle">Quick estimate</h1>
+        <p class="subtitle">Start with just a model name. We fill the rest, then let you tune every assumption.</p>
+      </div>
+      <button class="star" id="star" aria-label="favorite">☆</button>
+    </div>
+
+    <!-- input -->
+    <div class="card inputCard">
+      <div class="inputRow">
+        <div class="field">
+          <label class="fieldLabel">Model — Hugging Face ID</label>
+          <div class="fieldRow">
+            <input class="inp" value="meta-llama/Llama-3.1-8B-Instruct" />
+            <span class="chipGreen">✓ Auto-detected</span>
+          </div>
+        </div>
+        <div class="field">
+          <label class="fieldLabel">GPU target</label>
+          <select class="sel"><option>NVIDIA H100 80GB</option><option>NVIDIA H200 141GB</option><option>NVIDIA A100 80GB</option><option>NVIDIA L40S 48GB</option></select>
+        </div>
+        <button class="btn btnPri">Calculate</button>
+      </div>
+      <div class="switchRow"><span class="sw"></span> Add Hugging Face token (for gated or private models)</div>
+    </div>
+
+    <!-- warning -->
+    <div class="warn">
+      <span class="ic">⚠</span>
+      <span>Based on a default workload — ISL 100, OSL 50, FP16 KV cache, 90% GPU utilization, 0% prefix-cache hit. Edit assumptions below to match your traffic.</span>
+      <button class="btnLink" onclick="document.getElementById('acc-workload').classList.add('open')">Customize →</button>
+    </div>
+
+    <!-- tiles -->
+    <div class="tilesGrid">
+      <div class="flip tileDark" onclick="this.classList.toggle('flipped')">
+        <div class="flipFace flipFront">
+          <span class="spark"><svg width="96" height="36" viewBox="0 0 96 36"><path d="M1,33 L16,33 L33,33 L48,30 L64,30 L80,22 L95,12" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="95" cy="12" r="2.4" fill="#fff"/></svg></span>
+          <span class="tileLabel">▦ GPUs required</span>
+          <span class="tileValue">1<span class="tileUnit">× H100</span></span>
+          <span class="tileSub">Range 1–2 · 87 active requests</span>
+          <span class="seeMath">↻ see math</span>
+        </div>
+        <div class="flipFace flipBack">
+          <div class="backTitle">How we got 1</div>
+          <div class="formula">total memory = <span class="em">20 GB</span><br>usable / GPU = <span class="em">72 GB</span> (90% of 80)<br>⌈20 ÷ 72⌉ = <span class="em">1 GPU</span><br>peak 3× → range up to 2</div>
+          <span class="seeMath">↻ flip back</span>
+        </div>
+      </div>
+
+      <div class="flip" onclick="this.classList.toggle('flipped')">
+        <div class="flipFace flipFront">
+          <span class="tileLabel">▥ Weight memory <span class="qmark" title="Model parameters loaded into GPU memory ≈ params × bytes-per-number.">?</span></span>
+          <span class="tileValue">16<span class="tileUnit">GB</span></span>
+          <span class="tileSub">8B params × 2 bytes · BF16</span>
+          <span class="seeMath">↻ see math</span>
+        </div>
+        <div class="flipFace flipBack">
+          <div class="backTitle">Weight memory</div>
+          <div class="formula">params × bytes/param<br><span class="em">8B</span> × <span class="em">2</span> (BF16)<br>= <span class="em">16 GB</span></div>
+          <span class="seeMath">↻ flip back</span>
+        </div>
+      </div>
+
+      <div class="flip" onclick="this.classList.toggle('flipped')">
+        <div class="flipFace flipFront">
+          <span class="tileLabel">▤ KV cache / req <span class="qmark" title="Memory one in-flight request holds for its tokens.">?</span></span>
+          <span class="tileValue">19<span class="tileUnit">MB</span></span>
+          <span class="gqaChip">GQA · 4× smaller than MHA</span>
+          <span class="tileSub">128 KB/token × 150 tokens</span>
+          <span class="seeMath">↻ see math</span>
+        </div>
+        <div class="flipFace flipBack">
+          <div class="backTitle">KV cache / request</div>
+          <div class="formula">2 × layers × kv_heads ×<br>head_dim × bytes × tokens<br>2×<span class="em">32</span>×<span class="em">8</span>×<span class="em">128</span>×2 = 128 KB/tok<br>× <span class="em">150</span> = 19 MB</div>
+          <span class="seeMath">↻ flip back</span>
+        </div>
+      </div>
+
+      <div class="flip" onclick="this.classList.toggle('flipped')">
+        <div class="flipFace flipFront">
+          <span class="tileLabel">$ Monthly cost</span>
+          <span class="tileValue">$1,818</span>
+          <span class="tileSub">$2.49/gpu-hr × 730 hrs</span>
+          <span class="seeMath">↻ see math</span>
+        </div>
+        <div class="flipFace flipBack">
+          <div class="backTitle">Monthly cost</div>
+          <div class="formula">gpus × $/gpu-hr × hrs<br><span class="em">1</span> × <span class="em">$2.49</span> × <span class="em">730</span><br>= <span class="em">$1,818</span> / month</div>
+          <span class="seeMath">↻ flip back</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- two col -->
+    <div class="twoCol">
+      <div class="card">
+        <div class="cardHead"><span class="cardTitle">KV cache scenarios</span><span class="qmark" title="KV cache grows with prompt length and concurrent users.">?</span><span class="cardHint">total across 87 active requests</span></div>
+        <div class="cardBody">
+          <div class="scenRow">
+            <div class="scen scenCyan"><div class="scenLabel">Prompt only</div><div class="scenValue vCyan">1.1<span class="scenUnit">GB</span></div><div class="scenSub">100 tokens × 87 requests</div></div>
+            <div class="scen scenPurple"><div class="scenLabel">Typical request</div><div class="scenValue vPurple">1.6<span class="scenUnit">GB</span></div><div class="scenSub">150 tokens × 87 requests</div></div>
+            <div class="scen scenOrange"><div class="scenLabel">Worst-case context <span class="qmark" title="KV if every request filled the full context window at once.">?</span></div><div class="scenValue vOrange">87<span class="scenUnit">GB</span></div><div class="scenSub">8,192 tokens × 87 requests</div></div>
+          </div>
+        </div>
+        <div class="insight"><span class="ic">ⓘ</span><span><strong>GQA detected</strong> — 8 KV heads / 32 attention heads. KV cache is ~4× smaller than full MHA.</span></div>
+      </div>
+
+      <div class="card">
+        <div class="cardHead"><span class="cardTitle">Why this GPU count?</span></div>
+        <div class="cardBody">
+          <div class="constraint"><span class="dot dOk"></span><span class="conLabel">Memory fit</span><span class="conDetail">20.0 / 72 GB usable</span><span class="pill pOk">OK</span></div>
+          <div class="constraint"><span class="dot dOk"></span><span class="conLabel">KV cache fit</span><span class="conDetail">1.6 GB · fits 1 GPU</span><span class="pill pOk">OK</span></div>
+          <div class="constraint"><span class="dot dOk"></span><span class="conLabel">Scheduler · max_num_seqs <span class="qmark" title="vLLM batch limit on concurrent sequences.">?</span></span><span class="conDetail">87 / 256 sequences</span><span class="pill pOk">OK</span></div>
+          <div class="constraint"><span class="dot dWatch"></span><span class="conLabel">Batched tokens · prefill <span class="qmark" title="Tokens processed per forward pass.">?</span></span><span class="conDetail">8,700 / 8,192 per step</span><span class="pill pWatch">Watch</span></div>
+          <div class="constraint"><span class="dot dOk"></span><span class="conLabel">Tensor parallel minimum <span class="qmark" title="How many GPUs one model copy spans.">?</span></span><span class="conDetail">TP = 1 (fits one GPU)</span><span class="pill pOk">OK</span></div>
+          <div class="botNote"><strong>Bottleneck:</strong> Model weights — KV cache and scheduling have headroom.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- drivers -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="cardHead"><span class="cardTitle">What moves this estimate</span><span class="qmark" title="Assumptions that change the GPU count the most.">?</span><span class="cardHint">ranked by impact on GPU count</span></div>
+      <div class="cardBody">
+        <div class="driver"><span class="rank">1</span><div><div class="dName">Peak traffic multiplier</div><div class="dReason">A 3× spike triples active requests and KV memory.</div></div><span class="dRange">1× → 2 GPUs</span><div class="barTrack"><div class="barFill" style="width:92%"></div></div></div>
+        <div class="driver"><span class="rank">2</span><div><div class="dName">Prompt length (ISL)</div><div class="dReason">Longer prompts grow KV cache linearly per request.</div></div><span class="dRange">4K → 3 GPUs</span><div class="barTrack"><div class="barFill" style="width:74%"></div></div></div>
+        <div class="driver"><span class="rank">3</span><div><div class="dName">Active-request ratio</div><div class="dReason">Share of daily traffic live at once sets batch size.</div></div><span class="dRange">2× → 2 GPUs</span><div class="barTrack"><div class="barFill" style="width:55%"></div></div></div>
+        <div class="driver"><span class="rank">4</span><div><div class="dName">Prefix-cache hit rate</div><div class="dReason">Shared prefixes reuse KV and cut memory.</div></div><span class="dRange">50% → −0.6 GB</span><div class="barTrack"><div class="barFill" style="width:38%"></div></div></div>
+      </div>
+    </div>
+
+    <!-- memory -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="cardHead"><span class="cardTitle">Memory layout</span><span class="cardHint">per GPU · 72 GB usable of 80 GB</span></div>
+      <div class="cardBody">
+        <div class="memBar">
+          <div style="width:22%;background:var(--chart1)"></div>
+          <div style="width:2.2%;background:var(--chart2)"></div>
+          <div style="width:3.3%;background:var(--chart3)"></div>
+          <div style="width:72.5%;background:var(--bg3)"></div>
+        </div>
+        <div class="memLegend">
+          <span class="memLeg"><span class="memSw" style="background:var(--chart1)"></span>Model weights <strong>16 GB</strong></span>
+          <span class="memLeg"><span class="memSw" style="background:var(--chart2)"></span>KV cache <strong>1.6 GB</strong></span>
+          <span class="memLeg"><span class="memSw" style="background:var(--chart3)"></span>Activations <strong>2.4 GB</strong></span>
+          <span class="memLeg"><span class="memSw" style="background:var(--bg3)"></span>Free <strong>52 GB</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- assumptions -->
+    <div class="aHead"><span class="aTitle">Want to change assumptions?</span><button class="btnLink">Reset to defaults</button></div>
+    <p class="aSub">Every number above comes from these. Open a section to tune it — closed sections show their current values.</p>
+
+    <div class="acc" id="acc-workload"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">Workload</span><span class="accSummary"><span><span class="k">ISL</span> 100</span><span><span class="k">OSL</span> 50</span><span><span class="k">req/day</span> 1M</span><span><span class="k">peak</span> 3×</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">Input sequence length (ISL)</label><input class="inp" value="100"></div><div class="accField"><label class="accFieldLabel">Output sequence length (OSL)</label><input class="inp" value="50"></div><div class="accField"><label class="accFieldLabel">Requests per day</label><input class="inp" value="1,000,000"></div><div class="accField"><label class="accFieldLabel">Peak multiplier</label><input class="inp" value="3"></div></div></div></div>
+
+    <div class="acc"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">Precision &amp; memory</span><span class="accSummary"><span><span class="k">weights</span> BF16</span><span><span class="k">KV</span> FP16</span><span><span class="k">util</span> 90%</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">Weight precision</label><select class="sel"><option>BF16</option></select></div><div class="accField"><label class="accFieldLabel">KV cache precision</label><select class="sel"><option>FP16</option></select></div></div></div></div>
+
+    <div class="acc"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">Hardware</span><span class="accSummary"><span><span class="k">GPU</span> H100 80GB</span><span><span class="k">headroom</span> 10%</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">GPU type</label><select class="sel"><option>NVIDIA H100 80GB</option></select></div><div class="accField"><label class="accFieldLabel">Cost per GPU/hour</label><input class="inp" value="$2.49"></div></div></div></div>
+
+    <div class="acc"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">Parallelism</span><span class="badge bAdv">Advanced</span><span class="accSummary"><span><span class="k">TP</span> auto (1)</span><span><span class="k">replicas</span> 1</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">Tensor parallel size</label><input class="inp" value="auto"></div><div class="accField"><label class="accFieldLabel">Replica count</label><input class="inp" value="1"></div></div></div></div>
+
+    <div class="acc"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">vLLM engine</span><span class="badge bAdv">Advanced</span><span class="accSummary"><span><span class="k">block</span> 16</span><span><span class="k">max_num_seqs</span> 256</span><span><span class="k">prefix cache</span> on</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">block_size</label><input class="inp" value="16"></div><div class="accField"><label class="accFieldLabel">max_num_seqs</label><input class="inp" value="256"></div></div></div></div>
+
+    <div class="acc"><button class="accTog" onclick="this.parentElement.classList.toggle('open')"><span class="accCaret">▶</span><span class="cardTitle" style="font-size:16px">Model internals</span><span class="badge bAuto">Auto-detected</span><span class="accSummary"><span><span class="k">layers</span> 32</span><span><span class="k">heads</span> 32/8</span><span><span class="k">hidden</span> 4096</span></span></button><div class="accBody"><div class="accGrid"><div class="accField"><label class="accFieldLabel">Number of layers</label><input class="inp" value="32"></div><div class="accField"><label class="accFieldLabel">KV heads</label><input class="inp" value="8"></div></div></div></div>
+
+    <!-- footer -->
+    <div class="footerRow">
+      <button class="btn btnSec">Copy API request</button>
+      <button class="btn btnSec">Copy CLI command</button>
+      <button class="btn btnSec">Export to Sheets</button>
+      <span class="spacer"></span>
+      <button class="btn btnPri">Save estimate</button>
+    </div>
+    <button class="btnLink" style="margin-top:14px" onclick="var p=document.getElementById('api');p.style.display=p.style.display==='none'?'block':'none'">Preview API request body</button>
+    <pre class="apiBody" id="api" style="display:none">{
+  "model": { "model_id": "meta-llama/Llama-3.1-8B-Instruct", "max_model_len": "auto" },
+  "workload": { "isl_tokens": 100, "osl_tokens": 50, "prefix_cache_hit_rate": 0.0,
+                "requests_per_day": 1000000, "peak_multiplier": 3.0 },
+  "memory": { "weight_precision": "bf16", "kv_cache_precision": "fp16",
+              "gpu_memory_utilization": 0.90 },
+  "hardware": { "gpu_type": "H100_80GB" },
+  "engine": { "runtime": "vllm", "block_size": 16, "max_num_seqs": 256 }
+}</pre>
+  </div>
+  </main>
+</div>
+<script>
+  document.getElementById('star').onclick = function(){ this.textContent = this.textContent === '☆' ? '★' : '☆'; this.style.color = this.textContent==='★'?'#f0ab00':'var(--t3)'; };
+</script>
+</body>
+</html>

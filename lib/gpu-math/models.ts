@@ -99,17 +99,17 @@ export const MODEL_CATALOG: ModelSpec[] = [
   {
     id: 'mistral-7b',
     hfId: 'mistralai/Mistral-7B-Instruct-v0.3',
-    name: 'Mistral 7B', vendor: 'Mistral', paramLabel: '7B',
+    name: 'Mistral 7B', vendor: 'Mistral', paramLabel: '7B', tags: ['SlidingWindow'],
   },
   {
     id: 'mistral-nemo-12b',
     hfId: 'mistralai/Mistral-Nemo-Instruct-2407',
-    name: 'Mistral Nemo 12B', vendor: 'Mistral', paramLabel: '12B',
+    name: 'Mistral Nemo 12B', vendor: 'Mistral', paramLabel: '12B', tags: ['SlidingWindow'],
   },
   {
     id: 'mistral-small-22b',
     hfId: 'mistralai/Mistral-Small-Instruct-2409',
-    name: 'Mistral Small 22B', vendor: 'Mistral', paramLabel: '22B',
+    name: 'Mistral Small 22B', vendor: 'Mistral', paramLabel: '22B', tags: ['SlidingWindow'],
   },
   {
     id: 'mixtral-8x7b',

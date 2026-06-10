@@ -3,98 +3,212 @@
 import React from "react";
 import {
   Page,
+  PageSidebar,
+  PageSidebarBody,
   Masthead,
   MastheadMain,
   MastheadBrand,
-  MastheadContent,
-  SkipToContent,
+  Nav,
+  NavList,
+  NavItem,
 } from "@patternfly/react-core";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-const navItems = [
-  { label: "Home",          href: "/"              },
-  { label: "Quick Estimate",href: "/quick-estimate"},
-  { label: "Advanced",      href: "/calculator"    },
-  { label: "Explorer",      href: "/gpu-explorer"  },
-  { label: "Hybrid Savings",href: "/hybrid-savings"},
-  { label: "Routing",       href: "/routing"       },
-];
+import {
+  HomeIcon,
+  BoltIcon,
+  SlidersHIcon,
+  CubesIcon,
+  HistoryIcon,
+  DollarSignIcon,
+  RouteIcon,
+  CogIcon,
+  ListIcon,
+} from "@patternfly/react-icons";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   const masthead = (
-    <Masthead>
+    <Masthead style={{ backgroundColor: "#1a1a1a", borderBottom: "1px solid #2d2d2d" }}>
       <MastheadMain>
         <MastheadBrand>
-          <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}>
-            <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <Link
+            href="/"
+            style={{
+              textDecoration: "none",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "0 1rem",
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true">
               <circle cx="10" cy="10" r="10" fill="#ee0000" />
-              <path d="M5 13 L10 6 L15 13" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />
+              <path
+                d="M5 13 L10 6 L15 13"
+                stroke="white"
+                strokeWidth="2"
+                fill="none"
+                strokeLinejoin="round"
+              />
             </svg>
-            <span style={{
-              fontFamily: "var(--font-display)",
-              fontWeight: 700,
-              fontSize: "1.1rem",
-              color: "white",
-              letterSpacing: "-0.01em",
-            }}>
-              GPU<span style={{ color: "#ee0000" }}>Calc</span>
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 700,
+                fontSize: "1.5rem",
+                color: "white",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              gpu<span style={{ color: "#ee0000" }}>calc</span>
             </span>
           </Link>
         </MastheadBrand>
       </MastheadMain>
-
-      <MastheadContent>
-        <nav aria-label="Global navigation" className="rh-top-nav">
-          {navItems.map((item) => {
-            const active = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  textDecoration: "none",
-                  color: active ? "white" : "rgba(255,255,255,0.65)",
-                  fontFamily: "var(--font-body)",
-                  fontSize: "clamp(0.75rem, 1.2vw, 0.875rem)",
-                  fontWeight: active ? 600 : 400,
-                  padding: "6px clamp(6px, 1vw, 12px)",
-                  borderRadius: 4,
-                  background: active ? "rgba(255,255,255,0.12)" : "transparent",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  transition: "color 0.15s, background 0.15s",
-                }}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <span style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: "0.62rem",
-          color: "rgba(255,255,255,0.35)",
-          letterSpacing: "0.05em",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-          display: "var(--rh-version-display, block)",
-        }}>
-          v0.5 · redesign
-        </span>
-      </MastheadContent>
     </Masthead>
+  );
+
+  const navItemStyle = (isActive: boolean) => ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '14.5px',
+    fontWeight: 500,
+    fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
+    color: isActive ? '#ffffff' : 'rgba(255,255,255,0.85)',
+    padding: '9px 16px',
+    textDecoration: 'none',
+    borderBottom: 'none',
+  });
+
+  const iconStyle = { width: '15px', height: '15px' };
+
+  const NavItemWithIcon = ({
+    icon: Icon,
+    label,
+    href,
+    isActive
+  }: {
+    icon: any;
+    label: string;
+    href: string;
+    isActive: boolean;
+  }) => (
+    <NavItem
+      isActive={isActive}
+      to={href}
+      component={(props: any) => (
+        <Link {...props} style={navItemStyle(isActive)}>
+          <Icon style={iconStyle} />
+          <span>{label}</span>
+        </Link>
+      )}
+    />
+  );
+
+  const groupLabelStyle = {
+    padding: '12px 16px 3px',
+    fontSize: '11px',
+    fontWeight: 600,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    color: 'rgba(255,255,255,0.55)',
+    fontFamily: '"Plus Jakarta Sans", system-ui, sans-serif',
+  };
+
+  const sidebar = (
+    <PageSidebar
+      style={{
+        backgroundColor: "#1a1a1a",
+        borderRight: "1px solid #2d2d2d",
+      }}
+    >
+      <PageSidebarBody>
+        <Nav theme="dark" aria-label="Main navigation" style={{
+          '--pf-v5-c-nav__link--after--BorderColor': 'transparent',
+          '--pf-v5-c-nav__link--after--BorderWidth': '0'
+        } as React.CSSProperties}>
+          <NavList style={{
+            '--pf-v5-c-nav__item--after--BorderColor': 'transparent',
+            '--pf-v5-c-nav__item--after--BorderWidth': '0'
+          } as React.CSSProperties}>
+            <NavItemWithIcon
+              icon={HomeIcon}
+              label="Home"
+              href="/"
+              isActive={pathname === "/"}
+            />
+
+            <div style={groupLabelStyle}>ESTIMATE</div>
+
+            <NavItemWithIcon
+              icon={BoltIcon}
+              label="Quick estimate"
+              href="/quick-estimate"
+              isActive={pathname === "/quick-estimate"}
+            />
+            <NavItemWithIcon
+              icon={SlidersHIcon}
+              label="Advanced estimate"
+              href="/calculator"
+              isActive={pathname === "/calculator"}
+            />
+            <NavItemWithIcon
+              icon={CubesIcon}
+              label="GPU explorer"
+              href="/gpu-explorer"
+              isActive={pathname === "/gpu-explorer"}
+            />
+            <NavItemWithIcon
+              icon={ListIcon}
+              label="Compare"
+              href="/compare"
+              isActive={pathname === "/compare"}
+            />
+            <NavItemWithIcon
+              icon={HistoryIcon}
+              label="History"
+              href="#"
+              isActive={false}
+            />
+
+            <div style={groupLabelStyle}>OPTIMIZE</div>
+
+            <NavItemWithIcon
+              icon={DollarSignIcon}
+              label="Hybrid savings"
+              href="/hybrid-savings"
+              isActive={pathname === "/hybrid-savings"}
+            />
+            <NavItemWithIcon
+              icon={RouteIcon}
+              label="Routing"
+              href="/routing"
+              isActive={pathname === "/routing"}
+            />
+
+            <div style={groupLabelStyle}>SYSTEM</div>
+
+            <NavItemWithIcon
+              icon={CogIcon}
+              label="Settings"
+              href="#"
+              isActive={false}
+            />
+          </NavList>
+        </Nav>
+      </PageSidebarBody>
+    </PageSidebar>
   );
 
   return (
     <Page
       header={masthead}
-      skipToContent={
-        <SkipToContent href="#main-content">Skip to content</SkipToContent>
-      }
-      mainContainerId="main-content"
+      sidebar={sidebar}
+      isManagedSidebar
+      style={{ backgroundColor: "#f5f5f5" }}
     >
       {children}
     </Page>
