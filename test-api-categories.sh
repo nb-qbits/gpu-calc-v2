@@ -20,7 +20,7 @@ if [ "$MODE" = "prod" ]; then
   API_URL="https://gpu-calc-v2.vercel.app/api/v1/config"
   echo "🌍 Testing PRODUCTION API: $API_URL"
 else
-  API_URL="http://localhost:3000/api/v1/config"
+  API_URL="http://localhost:3005/api/v1/config"
   echo "🏠 Testing LOCAL API: $API_URL"
 fi
 
@@ -39,6 +39,7 @@ TESTS=(
   "ai21labs/AI21-Jamba-Mini-1.5|KV-5b|false"
   "nvidia/Nemotron-H-4B-Base-8K|KV-5b|false"
   "deepseek-ai/DeepSeek-R1|KV-2|false"
+  "zai-org/GLM-5.1-FP8|KV-2|false"
 )
 
 # Colors

@@ -9,7 +9,7 @@ if [ -z "$HF_TOKEN" ]; then
   exit 1
 fi
 
-API_URL="http://localhost:3000/api/v1/config"
+API_URL="http://localhost:3005/api/v1/config"
 
 echo "Testing API KV category detection..."
 echo "════════════════════════════════════════════════════════════"
