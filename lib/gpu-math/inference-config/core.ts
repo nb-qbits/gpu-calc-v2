@@ -15,8 +15,9 @@ import { MODEL_CATALOG } from '../models'
 import { detectKVCategory } from '../kv-detect'
 import { KV_CATEGORY_LABELS } from '../kv-types'
 import { extractConfig, resolveKVCacheDtype } from '../kv-config'
-import { computeKVCacheResult } from '../kv-formulas'
+import { computeKVCacheResult, computeKVMemory } from '../kv-formulas'
 import type { ModelFamilies, ExtractedConfig } from '../kv-types'
+import modelFamiliesData from '../model-families.json'
 
 /**
  * Main entry point for inference configuration engine.
@@ -45,6 +46,9 @@ export function computeInferenceConfig(
   // ═══ STEP 1: VALIDATION ═══
   const validation = validateOrThrow(req)
 
+  // Load model families for KV detection and config fallbacks
+  const families: ModelFamilies = modelFamiliesData as ModelFamilies
+
   // ═══ STEP 2: LOOKUP MODEL & GPU SPECS ═══
 
   // Find GPU in catalog
@@ -67,12 +71,14 @@ export function computeInferenceConfig(
     m.name === req.model_name
   )
 
-  // If model not in catalog, we need HF config to proceed
+  // If model not in catalog AND no HF config, we can still estimate
+  // This allows fallback estimation to work for unknown models
   if (!model && !req.hf_config) {
-    throw new Error(
-      `Model "${req.model_name}" not found in catalog. ` +
-      `Please fetch the model config from HuggingFace first, or select a model from the dropdown.`
+    console.warn(
+      `⚠️ Model "${req.model_name}" not found in catalog and no HF config provided. ` +
+      `Using fallback estimation based on model name.`
     )
+    // Will use fallback estimation below - don't throw error
   }
 
   // Use HF config if provided (takes precedence over catalog)
@@ -174,7 +180,7 @@ export function computeInferenceConfig(
 
   if (useHFConfig && req.hf_config) {
     // Use existing config extraction (handles MoE, MLA, sliding window, all field variants)
-    const cfg = extractConfig(req.hf_config as Record<string, unknown>)
+    const cfg = extractConfig(req.hf_config as Record<string, unknown>, families)
 
     console.log(`📊 Extracted config: ${cfg.model_type}, layers=${cfg.L}, hidden=${cfg.hidden_size}, is_moe=${cfg.is_moe}`)
     if (cfg.is_moe) {
@@ -224,7 +230,10 @@ export function computeInferenceConfig(
     }
     params_billions = parseInt(paramMatch[1], 10)
   } else {
-    throw new Error('Cannot determine parameter count - no model or config available')
+    // Unknown model - estimate from model name
+    const sizeMatch = req.model_name.match(/(\d+)B/i)
+    params_billions = sizeMatch ? parseInt(sizeMatch[1], 10) : 7
+    console.log(`📊 ${params_billions.toFixed(1)}B params (estimated from model name)`)
   }
 
   // Compute weight memory based on precision
@@ -271,7 +280,7 @@ export function computeInferenceConfig(
   let cfg: ExtractedConfig
 
   if (useHFConfig && req.hf_config) {
-    cfg = extractConfig(req.hf_config as Record<string, unknown>)
+    cfg = extractConfig(req.hf_config as Record<string, unknown>, families)
   } else if (model) {
     // Model in catalog but no HF config - create minimal config
     // This is a fallback - ideally we'd fetch the real HF config
@@ -284,9 +293,25 @@ export function computeInferenceConfig(
     const hasSlidingWindow = model.tags?.includes('SlidingWindow')
     const hasMoE = model.tags?.includes('MoE')
 
+    // Determine correct model_type for detection engine
+    let modelType = model.id
+    if (model.id.includes('jamba')) {
+      modelType = 'jamba'
+    } else if (model.id.includes('recurrentgemma')) {
+      modelType = 'recurrent_gemma'
+    } else if (model.id.includes('nemotron-h') && hasSSM) {
+      // Nemotron-H 56B is hybrid SSM+attention
+      modelType = 'nemotron_h'
+    } else if (model.id.includes('nemotron') && hasSSM) {
+      // Nemotron Mini 4B is pure transformer (no SSM despite tag)
+      modelType = 'nemotron'
+    } else if (model.id.includes('mamba')) {
+      modelType = 'mamba'
+    }
+
     // Rough estimates based on common architectures
     cfg = {
-      model_type: model.id,
+      model_type: modelType,
       L: estimatedParams < 20 ? 32 : estimatedParams < 100 ? 80 : 120,
       H_q: estimatedParams < 20 ? 32 : 64,
       H_kv: estimatedParams < 20 ? 32 : 8,  // Assume GQA for larger models
@@ -345,15 +370,142 @@ export function computeInferenceConfig(
       quantization_config: { type: 'none' }
     }
     console.log('⚠️ Using fallback config for catalog model (no HF config available)')
+
+    // Add warning to let user know we're using estimates
+    validation.warnings.push(
+      `⚠️ Using estimated architecture for ${model.name}. ` +
+      `Fetching from HuggingFace failed or model is gated. ` +
+      `For accurate results, provide a HuggingFace token or check model availability.`
+    )
   } else {
-    throw new Error('Cannot extract config - no HF config or catalog model available')
+    // Unknown model (not in catalog, no HF config) - create generic fallback
+    console.warn('⚠️ Unknown model - creating generic fallback config')
+
+    // Try to guess size from model name (e.g., "4B", "70B")
+    const sizeMatch = req.model_name.match(/(\d+)B/i)
+    const estimatedParams = sizeMatch ? parseInt(sizeMatch[1], 10) : 7
+
+    // Check if model name suggests SSM architecture
+    const lowerName = req.model_name.toLowerCase()
+    const isFalconMamba = /falcon[_-]mamba/i.test(req.model_name)
+    const isRwkv = lowerName.includes('rwkv')
+    const isMamba = lowerName.includes('mamba') && !isFalconMamba
+
+    const isSsmModel = isMamba || isRwkv || isFalconMamba
+
+    if (isSsmModel) {
+      // SSM-shaped fallback config
+      cfg = {
+        model_type: isFalconMamba ? 'falcon_mamba' : isRwkv ? 'rwkv' : 'mamba',
+        L: estimatedParams < 10 ? 24 : estimatedParams < 20 ? 32 : estimatedParams < 100 ? 80 : 120,
+        H_q: estimatedParams < 20 ? 32 : 64,
+        H_kv: estimatedParams < 20 ? 32 : 8,
+        d: 128,
+        d_source: 'computed' as const,
+        hidden_size: estimatedParams < 10 ? 2048 : estimatedParams < 20 ? 4096 : estimatedParams < 100 ? 8192 : 16384,
+        intermediate_size: estimatedParams < 10 ? 5504 : estimatedParams < 20 ? 11008 : estimatedParams < 100 ? 28672 : 49152,
+        vocab_size: 128000,
+        B: 2,
+        dtype: 'bfloat16',
+        sliding_window: null,
+        sliding_window_pattern: null,
+        use_sliding_window: null,
+        global_attn_every_n_layers: null,
+        layer_types: null,
+        max_window_layers: null,
+        kv_lora_rank: null,
+        qk_rope_head_dim: null,
+        use_cla: null,
+        cla_share_factor: null,
+        ssm_cfg: {},  // Signal SSM architecture
+        mamba_d_state: null,
+        mamba_d_conv: null,
+        mamba_expand: null,
+        attn_layer_period: null,
+        attn_layer_offset: null,
+        attention_layers_idx: null,
+        block_types: null,
+        attention_window_size: null,
+        lru_width: null,
+        conv1d_width: null,
+        residual_in_fp32: null,
+        is_moe: false,
+        total_routed_experts: null,
+        shared_experts: 0,
+        active_routed_per_tok: null,
+        total_experts: null,
+        active_experts_per_tok: null,
+        active_ratio: null,
+        moe_intermediate_size: null,
+        expert_layer_period: null,
+        expert_layer_offset: 0,
+        is_multimodal: false,
+        mm_tokens_per_image: null,
+        quantization_config: { type: 'none' }
+      }
+
+      validation.warnings.push(
+        `⚠️ Architecture inferred from model name only — config.json could not be parsed. KV-5a assumed. Results may be inaccurate.`
+      )
+    } else {
+      // Standard KV-1 fallback
+      cfg = {
+        model_type: req.model_name,
+        L: estimatedParams < 10 ? 24 : estimatedParams < 20 ? 32 : estimatedParams < 100 ? 80 : 120,
+        H_q: estimatedParams < 20 ? 32 : 64,
+        H_kv: estimatedParams < 20 ? 32 : 8,
+        d: 128,
+        d_source: 'computed' as const,
+        hidden_size: estimatedParams < 10 ? 2048 : estimatedParams < 20 ? 4096 : estimatedParams < 100 ? 8192 : 16384,
+        intermediate_size: estimatedParams < 10 ? 5504 : estimatedParams < 20 ? 11008 : estimatedParams < 100 ? 28672 : 49152,
+        vocab_size: 128000,
+        B: 2,
+        dtype: 'bfloat16',
+        sliding_window: null,
+        sliding_window_pattern: null,
+        use_sliding_window: null,
+        global_attn_every_n_layers: null,
+        layer_types: null,
+        max_window_layers: null,
+        kv_lora_rank: null,
+        qk_rope_head_dim: null,
+        use_cla: null,
+        cla_share_factor: null,
+        ssm_cfg: null,
+        mamba_d_state: null,
+        mamba_d_conv: null,
+        mamba_expand: null,
+        attn_layer_period: null,
+        attn_layer_offset: null,
+        attention_layers_idx: null,
+        block_types: null,
+        attention_window_size: null,
+        lru_width: null,
+        conv1d_width: null,
+        residual_in_fp32: null,
+        is_moe: false,
+        total_routed_experts: null,
+        shared_experts: 0,
+        active_routed_per_tok: null,
+        total_experts: null,
+        active_experts_per_tok: null,
+        active_ratio: null,
+        moe_intermediate_size: null,
+        expert_layer_period: null,
+        expert_layer_offset: 0,
+        is_multimodal: false,
+        mm_tokens_per_image: null,
+        quantization_config: { type: 'none' }
+      }
+
+      validation.warnings.push(
+        `⚠️ Using generic fallback for unknown model "${req.model_name}". ` +
+        `Results are rough estimates. Add model to catalog or provide HuggingFace config for accuracy.`
+      )
+    }
   }
 
   // Detect KV category using the proper detection engine
-  // Model families are loaded from model-families.json in production
-  // For now, pass empty object - detection will work from config fields
-  const families: ModelFamilies = {}
-
   const detection = detectKVCategory(cfg, families)
   console.log('🔍 KV category detection result:', detection)
 
@@ -382,18 +534,30 @@ export function computeInferenceConfig(
 
   console.log('📊 KV cache result:', kvResult)
 
-  // Calculate KV cache memory for the workload
-  const total_context = req.isl + req.osl
-  const kv_bytes_per_token = kvResult.kv_bytes_per_token
-  const kv_gb_per_sequence = (kv_bytes_per_token * total_context) / 1e9
+  // Use KV cache engine to compute memory with proper category-specific formulas
+  // This handles KV-3b hybrid layers, KV-2 MLA, KV-5b SSM, etc. correctly
+  const deployParams = {
+    tp: tp_size,
+    ISL: req.isl,
+    OSL: req.osl,
+    max_model_len: req.isl + req.osl,
+    max_num_seqs: req.concurrent_users,  // Use actual concurrent users for now
+    block_size: 16 as const,
+    gpu_memory_utilization: utilization,
+    kv_cache_dtype: req.kv_cache_precision || req.precision,
+    mamba_ssm_cache_dtype: 'bfloat16' as const
+  }
 
-  console.log(`   KV: ${kv_bytes_per_token.toFixed(0)} bytes/token × ${total_context} tokens = ${kv_gb_per_sequence.toFixed(3)} GB/seq`)
+  const kvMemory = computeKVMemory(kvResult, cfg, deployParams, families)
+  const kv_cache_used_gb = kvMemory.expected / 1e9
+
+  console.log(`   KV cache total: ${kv_cache_used_gb.toFixed(2)} GB for ${req.concurrent_users} users`)
 
   // Available memory per replica for KV cache
   const kv_budget_per_replica_gb = usable_gb - weight_gb_per_gpu
 
-  // Calculate actual KV cache used by concurrent users
-  const kv_cache_used_gb = (req.concurrent_users * kv_gb_per_sequence)
+  // Calculate per-sequence memory for max_sequences_from_memory calculation
+  const kv_gb_per_sequence = kv_cache_used_gb / req.concurrent_users
 
   // Check if we need more replicas to fit the KV cache workload
   const kv_cache_per_replica = kv_cache_used_gb / replicas
@@ -419,6 +583,7 @@ export function computeInferenceConfig(
   const memory_analysis: MemoryAnalysis = {
     weight_gb,
     weight_gb_per_gpu,
+    total_vram_gb: gpu.vramGb,  // Total GPU HBM capacity
     usable_hbm_per_gpu: usable_gb,
     tp_size,
     replicas,

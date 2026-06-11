@@ -1,0 +1,65 @@
+{
+  "jamba": {
+    "kv_category": "KV-5b",
+    "verified": true
+  },
+  "nemotron_h": {
+    "kv_category": "KV-5b",
+    "verified": true
+  },
+  "recurrent_gemma": {
+    "kv_category": "KV-5c",
+    "verified": true
+  },
+  "hawk": {
+    "kv_category": "KV-5c",
+    "verified": true
+  },
+  "griffin": {
+    "kv_category": "KV-5c",
+    "verified": true
+  },
+  "mamba": {
+    "kv_category": "KV-5a",
+    "verified": true
+  },
+  "mamba2": {
+    "kv_category": "KV-5a",
+    "verified": true
+  },
+  "rwkv": {
+    "kv_category": "KV-5a",
+    "verified": true
+  },
+  "falcon_mamba": {
+    "kv_category": "KV-5a",
+    "verified": true
+  },
+  "gemma3_text": {
+    "kv_category": "KV-3b",
+    "pattern_default": 6,
+    "config_fallbacks_by_layers": {
+      "26": {
+        "num_attention_heads": 4,
+        "num_key_value_heads": 1,
+        "head_dim": 256
+      },
+      "34": {
+        "num_attention_heads": 8,
+        "num_key_value_heads": 4,
+        "head_dim": 256
+      },
+      "48": {
+        "num_attention_heads": 16,
+        "num_key_value_heads": 8,
+        "head_dim": 240
+      },
+      "62": {
+        "num_attention_heads": 32,
+        "num_key_value_heads": 16,
+        "head_dim": 128
+      }
+    },
+    "notes": "Gemma 3 4B text_config is incomplete on HuggingFace. Values from Unsloth verified config and transformers Gemma3TextConfig defaults. head_dim not derivable from hidden_size for Gemma."
+  }
+}

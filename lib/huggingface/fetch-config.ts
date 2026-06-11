@@ -116,13 +116,13 @@ export async function fetchModelConfig(
     })
 
     if (!response.ok) {
-      if (response.status === 401) {
-        console.error('❌ 401 Unauthorized - Token is missing or invalid')
+      if (response.status === 401 || response.status === 403) {
+        console.error('❌ 401/403 Unauthorized - Token is missing or invalid')
         console.error('   Token was provided:', hfToken ? 'Yes' : 'No')
         console.error('   Token starts with hf_:', hfToken ? hfToken.startsWith('hf_') : 'N/A')
         return {
           success: false,
-          error: 'Authentication required. This model is gated - please add your HuggingFace token above.',
+          error: 'Model is gated or private. Add HuggingFace token above for accurate results.',
           source: 'huggingface'
         }
       } else if (response.status === 404) {
@@ -136,22 +136,37 @@ export async function fetchModelConfig(
         }
         return {
           success: false,
-          error: `Model "${modelId}" not found on HuggingFace. Check spelling and try again.`,
+          error: `Model not found on HuggingFace. Check model name spelling.`,
           source: 'huggingface'
         }
       } else {
         return {
           success: false,
-          error: `Failed to fetch config: ${response.status} ${response.statusText}`,
+          error: `HuggingFace API error (${response.status}). Using estimated config.`,
           source: 'huggingface'
         }
       }
     }
 
-    const config: HFModelConfig = await response.json()
+    // Parse JSON, handling invalid literals (Infinity, -Infinity, NaN)
+    // Some HF configs use JavaScript literals instead of valid JSON
+    const text = await response.text()
+    const sanitized = text
+      .replace(/:\s*Infinity\b/g, ': 1e308')        // Infinity → very large number
+      .replace(/:\s*-Infinity\b/g, ': -1e308')      // -Infinity → very small number
+      .replace(/:\s*NaN\b/g, ': null')              // NaN → null
+      .replace(/,\s*Infinity\b/g, ', 1e308')        // Array: [0.0, Infinity]
+      .replace(/,\s*-Infinity\b/g, ', -1e308')      // Array: [-Infinity, 0.0]
+      .replace(/,\s*NaN\b/g, ', null')              // Array: [NaN, 1.0]
+
+    const config: HFModelConfig = JSON.parse(sanitized)
 
     // Validate that it's actually a model config
-    if (!config.model_type && !config.architectures) {
+    // Accept if has model_type/architectures OR SSM-specific fields
+    const hasStandardFields = config.model_type || config.architectures
+    const hasSsmFields = config.ssm_cfg != null || config.d_model != null
+
+    if (!hasStandardFields && !hasSsmFields) {
       return {
         success: false,
         error: 'Invalid config.json - missing model_type or architectures field',

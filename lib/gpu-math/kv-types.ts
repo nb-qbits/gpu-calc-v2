@@ -102,7 +102,7 @@ export interface ExtractedConfig {
   H_q:         number   // num_attention_heads
   H_kv:        number   // num_key_value_heads
   d:           number   // head_dim
-  d_source:    'explicit' | 'computed'
+  d_source:    'explicit' | 'computed' | 'model-families.json'
   hidden_size: number
   intermediate_size: number
   vocab_size:  number
@@ -311,6 +311,12 @@ export interface ModelFamilyEntry {
   block_types_fields?: string[]
   fallback?:           string
   verified?:           boolean
+  config_fallbacks_by_layers?: Record<string, {
+    num_attention_heads: number
+    num_key_value_heads: number
+    head_dim: number
+  }>
+  notes?: string
 }
 
 export type ModelFamilies = Record<string, ModelFamilyEntry>

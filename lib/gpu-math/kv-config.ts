@@ -72,7 +72,10 @@ function extractQuantConfig(raw: Record<string, unknown>): QuantizationConfig {
 
 // ─── Main extraction ──────────────────────────────────────────────────────────
 
-export function extractConfig(rawConfig: Record<string, unknown>): ExtractedConfig {
+export function extractConfig(
+  rawConfig: Record<string, unknown>,
+  families?: import('./kv-types').ModelFamilies
+): ExtractedConfig {
   // Multimodal models nest attention arch under text_config
   const cfg = (rawConfig.text_config as Record<string, unknown> | undefined) ?? rawConfig
 
@@ -87,11 +90,11 @@ export function extractConfig(rawConfig: Record<string, unknown>): ExtractedConf
 
   // head_dim: always use explicit value if present; compute only as fallback.
   // Using hiddenSize / H_q would give the wrong answer for Gemma-2 (12.5% error).
-  const H_q = num(cfg.num_attention_heads) ?? 1
+  let H_q = num(cfg.num_attention_heads) ?? 1
   const headDimExplicit = num(cfg.head_dim)
-  const hiddenSize = num(cfg.hidden_size) ?? 1
-  const d = headDimExplicit ?? hiddenSize / H_q
-  const d_source: ExtractedConfig['d_source'] = headDimExplicit != null ? 'explicit' : 'computed'
+  const hiddenSize = num(cfg.hidden_size) ?? num(cfg.d_model) ?? 1
+  let d = headDimExplicit ?? hiddenSize / H_q
+  let d_source: ExtractedConfig['d_source'] = headDimExplicit != null ? 'explicit' : 'computed'
 
   // MoE — resolve all known field name variants
   const total_routed_experts =
@@ -140,15 +143,39 @@ export function extractConfig(rawConfig: Record<string, unknown>): ExtractedConf
     (rawConfig.torch_dtype as string | undefined) ??
     (cfg.torch_dtype as string | undefined)
 
-  return {
-    model_type:
-      (cfg.model_type as string | undefined) ??
-      (rawConfig.model_type as string | undefined) ??
-      'unknown',
+  const model_type =
+    (cfg.model_type as string | undefined) ??
+    (rawConfig.model_type as string | undefined) ??
+    'unknown'
 
-    L:           num(cfg.num_hidden_layers) ?? 1,
+  const L = num(cfg.num_hidden_layers) ?? num(cfg.n_layer) ?? 1
+  let H_kv = num(cfg.num_key_value_heads) ?? H_q
+
+  // ── Fallback: Fill missing architecture fields from model-families.json ──────
+  // For models with incomplete configs (e.g., Gemma 3 4B), use verified values
+  // keyed by num_hidden_layers. Only fills null fields — never overwrites.
+  if (families?.[ model_type ]?.config_fallbacks_by_layers) {
+    const fallback = families[ model_type ].config_fallbacks_by_layers![ String(L) ]
+    if (fallback) {
+      if (num(cfg.num_attention_heads) == null) {
+        H_q = fallback.num_attention_heads
+      }
+      if (num(cfg.num_key_value_heads) == null) {
+        H_kv = fallback.num_key_value_heads
+      }
+      if (headDimExplicit == null) {
+        d = fallback.head_dim
+        d_source = 'model-families.json' as const
+      }
+    }
+  }
+
+  return {
+    model_type,
+
+    L,
     H_q,
-    H_kv:        num(cfg.num_key_value_heads) ?? H_q,
+    H_kv,
     d,
     d_source,
     hidden_size: hiddenSize,
