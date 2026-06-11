@@ -278,6 +278,12 @@ export function computeInferenceConfig(
     const paramMatch = model.paramLabel.match(/(\d+)B/)
     const estimatedParams = paramMatch ? parseInt(paramMatch[1], 10) : 70
 
+    // Check model tags to set architecture-specific fields
+    const hasMLA = model.tags?.includes('MLA')
+    const hasSSM = model.tags?.includes('SSM')
+    const hasSlidingWindow = model.tags?.includes('SlidingWindow')
+    const hasMoE = model.tags?.includes('MoE')
+
     // Rough estimates based on common architectures
     cfg = {
       model_type: model.id,
@@ -292,23 +298,25 @@ export function computeInferenceConfig(
       B: 2,
       dtype: 'bfloat16',
 
-      sliding_window: null,
+      sliding_window: hasSlidingWindow ? 4096 : null,
       sliding_window_pattern: null,
-      use_sliding_window: null,
+      use_sliding_window: hasSlidingWindow || null,
       global_attn_every_n_layers: null,
       layer_types: null,
       max_window_layers: null,
 
-      kv_lora_rank: null,
-      qk_rope_head_dim: null,
+      // MLA fields - use typical DeepSeek values if MLA tag present
+      kv_lora_rank: hasMLA ? 512 : null,
+      qk_rope_head_dim: hasMLA ? 64 : null,
 
       use_cla: null,
       cla_share_factor: null,
 
-      ssm_cfg: null,
-      mamba_d_state: null,
-      mamba_d_conv: null,
-      mamba_expand: null,
+      // SSM fields
+      ssm_cfg: hasSSM ? {} : null,
+      mamba_d_state: hasSSM ? 128 : null,
+      mamba_d_conv: hasSSM ? 4 : null,
+      mamba_expand: hasSSM ? 2 : null,
 
       attn_layer_period: null,
       attn_layer_offset: null,
@@ -320,14 +328,15 @@ export function computeInferenceConfig(
       conv1d_width: null,
       residual_in_fp32: null,
 
-      is_moe: false,
-      total_routed_experts: null,
-      shared_experts: 0,
-      active_routed_per_tok: null,
-      total_experts: null,
-      active_experts_per_tok: null,
-      active_ratio: null,
-      moe_intermediate_size: null,
+      // MoE fields - use typical values based on model
+      is_moe: hasMoE || false,
+      total_routed_experts: hasMoE ? (model.id.includes('deepseek') ? 256 : model.id.includes('mixtral') && model.paramLabel.includes('22') ? 8 : 8) : null,
+      shared_experts: hasMoE && model.id.includes('deepseek') ? 1 : 0,
+      active_routed_per_tok: hasMoE ? (model.id.includes('deepseek') ? 8 : 2) : null,
+      total_experts: hasMoE ? (model.id.includes('deepseek') ? 257 : 8) : null,
+      active_experts_per_tok: hasMoE ? (model.id.includes('deepseek') ? 9 : 2) : null,
+      active_ratio: hasMoE ? (model.id.includes('deepseek') ? 9/257 : 2/8) : null,
+      moe_intermediate_size: hasMoE ? (model.id.includes('deepseek') ? 2048 : 4096) : null,
       expert_layer_period: null,
       expert_layer_offset: 0,
 
