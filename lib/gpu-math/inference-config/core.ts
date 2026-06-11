@@ -16,7 +16,7 @@ import { detectKVCategory } from '../kv-detect'
 import { KV_CATEGORY_LABELS } from '../kv-types'
 import { extractConfig, resolveKVCacheDtype } from '../kv-config'
 import { computeKVCacheResult } from '../kv-formulas'
-import type { ModelFamilies } from '../kv-types'
+import type { ModelFamilies, ExtractedConfig } from '../kv-types'
 
 /**
  * Main entry point for inference configuration engine.
@@ -267,7 +267,78 @@ export function computeInferenceConfig(
   // ═══ STEP 5: COMPUTE KV CACHE BUDGET ═══
 
   // Use existing KV cache engine for accurate category-specific calculation
-  const cfg = extractConfig(req.hf_config as Record<string, unknown>)
+  // For catalog models without HF config, we need to build a minimal config from model metadata
+  let cfg: ExtractedConfig
+
+  if (useHFConfig && req.hf_config) {
+    cfg = extractConfig(req.hf_config as Record<string, unknown>)
+  } else if (model) {
+    // Model in catalog but no HF config - create minimal config
+    // This is a fallback - ideally we'd fetch the real HF config
+    const paramMatch = model.paramLabel.match(/(\d+)B/)
+    const estimatedParams = paramMatch ? parseInt(paramMatch[1], 10) : 70
+
+    // Rough estimates based on common architectures
+    cfg = {
+      model_type: model.id,
+      L: estimatedParams < 20 ? 32 : estimatedParams < 100 ? 80 : 120,
+      H_q: estimatedParams < 20 ? 32 : 64,
+      H_kv: estimatedParams < 20 ? 32 : 8,  // Assume GQA for larger models
+      d: 128,
+      d_source: 'computed' as const,
+      hidden_size: estimatedParams < 20 ? 4096 : estimatedParams < 100 ? 8192 : 16384,
+      intermediate_size: estimatedParams < 20 ? 11008 : estimatedParams < 100 ? 28672 : 49152,
+      vocab_size: 128000,
+      B: 2,
+      dtype: 'bfloat16',
+
+      sliding_window: null,
+      sliding_window_pattern: null,
+      use_sliding_window: null,
+      global_attn_every_n_layers: null,
+      layer_types: null,
+      max_window_layers: null,
+
+      kv_lora_rank: null,
+      qk_rope_head_dim: null,
+
+      use_cla: null,
+      cla_share_factor: null,
+
+      ssm_cfg: null,
+      mamba_d_state: null,
+      mamba_d_conv: null,
+      mamba_expand: null,
+
+      attn_layer_period: null,
+      attn_layer_offset: null,
+      attention_layers_idx: null,
+
+      block_types: null,
+      attention_window_size: null,
+      lru_width: null,
+      conv1d_width: null,
+      residual_in_fp32: null,
+
+      is_moe: false,
+      total_routed_experts: null,
+      shared_experts: 0,
+      active_routed_per_tok: null,
+      total_experts: null,
+      active_experts_per_tok: null,
+      active_ratio: null,
+      moe_intermediate_size: null,
+      expert_layer_period: null,
+      expert_layer_offset: 0,
+
+      is_multimodal: false,
+      mm_tokens_per_image: null,
+      quantization_config: { type: 'none' }
+    }
+    console.log('⚠️ Using fallback config for catalog model (no HF config available)')
+  } else {
+    throw new Error('Cannot extract config - no HF config or catalog model available')
+  }
 
   // Detect KV category using the proper detection engine
   // Model families are loaded from model-families.json in production
