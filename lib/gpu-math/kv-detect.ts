@@ -51,7 +51,8 @@ export function detectKVCategory(
     cfg.mamba_d_state != null ||
     cfg.mamba_d_conv  != null ||
     cfg.mamba_expand  != null ||
-    cfg.ssm_cfg       != null
+    cfg.ssm_cfg       != null ||
+    (cfg as any).ssm_state_size != null  // Nemotron-H uses this field
 
   const attnSignal =
     cfg.H_q != null && (
@@ -60,13 +61,46 @@ export function detectKVCategory(
       cfg.attention_layers_idx != null
     )
 
-  // ── KV-5b: SSM + Attention hybrid (Jamba, Nemotron) ──────────────────────
+  // ── KV-5b: SSM + Attention hybrid (Jamba, Nemotron-H) ────────────────────
+
+  // First priority: Config signals (SSM + attention fields both present)
   if (ssmSignal && attnSignal) {
     return {
       category:   'KV-5b',
       source:     'config.json',
       confidence: 'high',
       fields:     ['attn_layer_period', 'mamba_d_state'],
+    }
+  }
+
+  // Second priority: model-families.json override (only if signals confirm OR model family is trusted)
+  const family = families[cfg.model_type]
+  if (family?.kv_category === 'KV-5b') {
+    // If config has SSM signal but missing attn signal, still trust family override
+    // (e.g., Jamba with attn_layer_period missing but model_type='jamba' is reliable)
+    if (ssmSignal || attnSignal) {
+      return {
+        category:   'KV-5b',
+        source:     'model-families.json',
+        confidence: 'high',
+        fields:     ssmSignal && attnSignal
+          ? ['model_type', 'mamba_d_state', 'attn_layer_period']
+          : ssmSignal
+          ? ['model_type', 'mamba_d_state']
+          : ['model_type'],
+      }
+    } else {
+      // Model family says KV-5b but NO config signals — very suspicious!
+      return {
+        category:   'KV-5b',
+        source:     'model-families.json',
+        confidence: 'low',
+        fields:     ['model_type'],
+        warnings:   [
+          'KV-5b inferred from model family name only — no SSM config fields found. ' +
+          'Verify this is a hybrid SSM model.',
+        ],
+      }
     }
   }
 

@@ -26,6 +26,7 @@ export interface InferenceRequest {
 export interface MemoryAnalysis {
   weight_gb: number
   weight_gb_per_gpu: number
+  total_vram_gb: number       // Total GPU HBM capacity
   usable_hbm_per_gpu: number
   tp_size: number
   replicas: number

@@ -195,7 +195,9 @@ export const MODEL_CATALOG: ModelSpec[] = [
   {
     id: 'nemotron-mini-4b',
     hfId: 'nvidia/Nemotron-Mini-4B-Instruct',
-    name: 'Nemotron Mini 4B', vendor: 'NVIDIA', paramLabel: '4B', tags: ['SSM'],
+    name: 'Nemotron Mini 4B', vendor: 'NVIDIA', paramLabel: '4B',
+    // NOTE: Despite the name, Nemotron Mini 4B is a standard transformer, NOT SSM
+    // Only Nemotron-H 56B is hybrid SSM+attention
   },
   {
     id: 'nemotron-h-56b',
