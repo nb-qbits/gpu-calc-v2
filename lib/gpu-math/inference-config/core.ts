@@ -14,7 +14,9 @@ import { GPU_CATALOG } from '../gpus'
 import { MODEL_CATALOG } from '../models'
 import { detectKVCategory } from '../kv-detect'
 import { KV_CATEGORY_LABELS } from '../kv-types'
-import { extractConfig } from '../kv-config'
+import { extractConfig, resolveKVCacheDtype } from '../kv-config'
+import { computeKVCacheResult } from '../kv-formulas'
+import type { ModelFamilies } from '../kv-types'
 
 /**
  * Main entry point for inference configuration engine.
@@ -264,37 +266,48 @@ export function computeInferenceConfig(
 
   // ═══ STEP 5: COMPUTE KV CACHE BUDGET ═══
 
-  // Simplified KV budget calculation with separate KV cache precision
-  // TODO: Integrate with existing KV cache engine (kv-formulas.ts) for precise calculation
-  // For now, use a conservative estimate adjusted by KV cache dtype
+  // Use existing KV cache engine for accurate category-specific calculation
+  const cfg = extractConfig(req.hf_config as Record<string, unknown>)
 
-  // Determine KV cache precision (defaults to weight precision if not specified)
-  const kv_cache_precision = req.kv_cache_precision || req.precision
+  // Detect KV category using the proper detection engine
+  // Model families are loaded from model-families.json in production
+  // For now, pass empty object - detection will work from config fields
+  const families: ModelFamilies = {}
 
-  // KV cache estimation based on model architecture
-  // KV bytes/token = 2 (K+V) × layers × kv_heads × head_dim × bytes_per_element / TP
-  // For Llama 70B: 2 × 80 layers × 8 KV heads × 128 head_dim × 2 bytes (FP16) = 327,680 bytes/token
-  // Divided by TP size: ~164 KB/token for TP=2
+  const detection = detectKVCategory(cfg, families)
+  console.log('🔍 KV category detection result:', detection)
 
-  // Rough estimation based on model size (more accurate than fixed 200 bytes)
-  // Small models (7-13B): ~40 KB/token
-  // Medium models (30-70B): ~160 KB/token
-  // Large models (175B+): ~400 KB/token
-  const kv_bytes_per_token_fp16 = params_billions < 20 ? 40000 :
-                                    params_billions < 100 ? 160000 :
-                                    400000
+  // Use detected category (overrides the simple detection above)
+  kv_category = detection.category
+  kv_category_label = KV_CATEGORY_LABELS[detection.category]
 
-  // Adjust for KV cache precision
-  const kv_precision_multiplier: Record<string, number> = {
-    FP16: 1.0,  // 2 bytes per element
-    FP8: 0.5    // 1 byte per element
-  }
+  // Compute accurate KV cache per token using the real formula
+  const kvResult = computeKVCacheResult(
+    cfg,
+    detection,
+    {
+      tp: tp_size,
+      max_model_len: req.isl + req.osl,
+      max_num_seqs: 256, // Will be overridden by vLLM config later
+      gpu_memory_utilization: utilization,
+      ISL: req.isl,
+      OSL: req.osl,
+      block_size: 128,
+      kv_cache_dtype: req.kv_cache_precision || req.precision,
+      mamba_ssm_cache_dtype: 'bfloat16'
+    },
+    families,
+    req.precision
+  )
 
-  // Adjust for tensor parallelism (KV cache is sharded across TP)
-  const kv_bytes_per_token_estimate = (kv_bytes_per_token_fp16 * kv_precision_multiplier[kv_cache_precision]) / tp_size
+  console.log('📊 KV cache result:', kvResult)
 
+  // Calculate KV cache memory for the workload
   const total_context = req.isl + req.osl
-  const kv_gb_per_sequence = (kv_bytes_per_token_estimate * total_context) / 1e9
+  const kv_bytes_per_token = kvResult.kv_bytes_per_token
+  const kv_gb_per_sequence = (kv_bytes_per_token * total_context) / 1e9
+
+  console.log(`   KV: ${kv_bytes_per_token.toFixed(0)} bytes/token × ${total_context} tokens = ${kv_gb_per_sequence.toFixed(3)} GB/seq`)
 
   // Available memory per replica for KV cache
   const kv_budget_per_replica_gb = usable_gb - weight_gb_per_gpu
