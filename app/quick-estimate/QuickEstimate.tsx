@@ -98,6 +98,8 @@ export default function QuickEstimate() {
   // HuggingFace config fetching
   const [hfConfig, setHfConfig] = React.useState<HFModelConfig | null>(null);
   const [isFetchingConfig, setIsFetchingConfig] = React.useState(false);
+  const [isUsingFallback, setIsUsingFallback] = React.useState(false);
+  const [fallbackReason, setFallbackReason] = React.useState<string>('');
 
   // Collapsible state for "Why this GPU count?" card
   const [whyGpuExpanded, setWhyGpuExpanded] = React.useState(false);
@@ -141,36 +143,51 @@ export default function QuickEstimate() {
   // Add loading state
   const [isCalculating, setIsCalculating] = React.useState(false);
 
-  // Fetch HF config when model changes (if not in catalog)
+  // Load saved HF token from localStorage on mount
   React.useEffect(() => {
-    const modelInCatalog = MODEL_CATALOG.find(m =>
-      m.hfId === model || m.id === model || m.name === model
-    );
-
-    if (modelInCatalog) {
-      // Model in catalog - no need to fetch
-      setHfConfig(null);
-      setIsFetchingConfig(false);
-      return;
+    if (typeof window !== 'undefined') {
+      const savedToken = localStorage.getItem('hf_token');
+      if (savedToken && savedToken.startsWith('hf_')) {
+        setHfToken(savedToken);
+        console.log('🔑 Loaded HF token from localStorage');
+      }
     }
+  }, []);
 
-    // Model NOT in catalog - fetch from HuggingFace
+  // Handle HF token changes and save to localStorage
+  const handleTokenChange = (newToken: string) => {
+    setHfToken(newToken);
+    if (typeof window !== 'undefined' && newToken && newToken.startsWith('hf_')) {
+      localStorage.setItem('hf_token', newToken);
+      console.log('💾 Saved HF token to localStorage');
+    }
+  };
+
+  // Fetch HF config when model changes - ALWAYS fetch for accuracy
+  React.useEffect(() => {
+    // Reset fallback state
+    setIsUsingFallback(false);
+    setFallbackReason('');
+
+    // Always fetch for ALL models (catalog + custom)
     const fetchConfig = async () => {
       setIsFetchingConfig(true);
       console.log('🔄 Fetching config from HuggingFace for:', model);
-      console.log('🔑 UI State - HF Token:', hfToken ? `Provided (length: ${hfToken.length}, starts with hf_: ${hfToken.startsWith('hf_')})` : 'Not provided');
-      console.log('🔑 Passing token to fetchModelConfig:', hfToken ? 'Yes' : 'No');
+      console.log('🔑 HF Token:', hfToken ? `Provided (${hfToken.substring(0, 7)}...)` : 'Not provided');
 
       const result = await fetchModelConfig(model, hfToken);
 
       if (result.success && result.config) {
         setHfConfig(result.config);
         setTestError(null);
+        setIsUsingFallback(false);
         console.log('✅ Fetched HF config:', result.config);
       } else {
+        // Fetch failed - will use fallback estimation
         setHfConfig(null);
-        setTestError(result.error || 'Failed to fetch model config');
-        console.error('❌ Failed to fetch HF config:', result.error);
+        setIsUsingFallback(true);
+        setFallbackReason(result.error || 'Unknown error');
+        console.warn('⚠️ Failed to fetch HF config, will use estimation:', result.error);
       }
 
       setIsFetchingConfig(false);
@@ -815,7 +832,7 @@ export default function QuickEstimate() {
               <input
                 type={hfReveal ? 'text' : 'password'}
                 value={hfToken}
-                onChange={(e) => setHfToken(e.target.value)}
+                onChange={(e) => handleTokenChange(e.target.value)}
                 placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
                 aria-label="Hugging Face token"
                 className={styles.hfInput}
@@ -882,6 +899,39 @@ export default function QuickEstimate() {
           </>
         )}
       </div>
+
+      {/* ---------- fallback warning ---------- */}
+      {isUsingFallback && !testError && (
+        <div style={{
+          padding: '16px 20px',
+          marginBottom: '20px',
+          background: '#e7f4ff',
+          border: '2px solid #0066cc',
+          borderRadius: '8px',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'flex-start'
+        }}>
+          <span style={{ fontSize: '24px', flexShrink: 0 }}>ℹ️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: '600', color: '#004085', marginBottom: '8px', fontSize: '16px' }}>
+              Using estimated architecture
+            </div>
+            <div style={{ fontSize: '14px', color: '#004085', lineHeight: '1.6', marginBottom: '8px' }}>
+              Could not fetch model configuration from HuggingFace. Using estimated values based on model size.
+              Results may be less accurate.
+            </div>
+            <div style={{ fontSize: '13px', color: '#004085' }}>
+              <strong>Reason:</strong> {fallbackReason}
+            </div>
+            {!hfToken && fallbackReason.includes('gated') && (
+              <div style={{ fontSize: '13px', color: '#004085', marginTop: '8px' }}>
+                💡 <strong>Tip:</strong> Add a HuggingFace token above for accurate results with gated models.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ---------- error display ---------- */}
       {testError && (
@@ -1326,7 +1376,7 @@ export default function QuickEstimate() {
               </span>
               <span>
                 <span style={{ display: 'inline-block', width: '12px', height: '12px', background: '#e0e0e0', marginRight: '6px', borderRadius: '2px' }}></span>
-                Reserved: <strong>{(testResult.memory_analysis.usable_hbm_per_gpu - testResult.memory_analysis.weight_gb_per_gpu - ((testResult.memory_analysis.kv_cache_used_gb || 0) / testResult.memory_analysis.replicas)).toFixed(1)} GB</strong>
+                Reserved: <strong>{(testResult.memory_analysis.total_vram_gb - testResult.memory_analysis.usable_hbm_per_gpu).toFixed(1)} GB</strong>
               </span>
             </div>
           </div>
