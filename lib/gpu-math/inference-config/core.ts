@@ -14,6 +14,7 @@ import { GPU_CATALOG } from '../gpus'
 import { MODEL_CATALOG } from '../models'
 import { detectKVCategory } from '../kv-detect'
 import { KV_CATEGORY_LABELS } from '../kv-types'
+import { extractConfig } from '../kv-config'
 
 /**
  * Main entry point for inference configuration engine.
@@ -170,76 +171,49 @@ export function computeInferenceConfig(
   let params_billions: number
 
   if (useHFConfig && req.hf_config) {
-    // Extract param count from HF config
-    const {
-      hidden_size = 4096,
-      num_hidden_layers = 32,
-      intermediate_size = 11008,
-      vocab_size = 32000,
-      // MoE-specific fields
-      n_routed_experts,
-      num_experts_per_tok,
-      moe_intermediate_size,
-      n_shared_experts
-    } = req.hf_config
+    // Use existing config extraction (handles MoE, MLA, sliding window, all field variants)
+    const cfg = extractConfig(req.hf_config as Record<string, unknown>)
 
-    // Check if this is a MoE model
-    const isMoE = n_routed_experts != null && n_routed_experts > 0
-
-    // Embedding params (shared across all models)
-    const embedding_params = vocab_size * hidden_size
-
-    // Attention params
-    // For models with LoRA compression (like GLM with kv_lora_rank/q_lora_rank),
-    // the actual params are much larger due to projection matrices
-    const {
-      kv_lora_rank,
-      q_lora_rank,
-      qk_head_dim,
-      num_attention_heads = hidden_size / 64,
-      num_key_value_heads = num_attention_heads
-    } = req.hf_config as any
-
-    let attention_params: number
-    if (kv_lora_rank && q_lora_rank) {
-      // MLA (Multi-head Latent Attention) - used in DeepSeek V2/V3, GLM
-      // Q projection: hidden -> q_lora_rank
-      // KV projection: hidden -> kv_lora_rank
-      // Output projection: hidden -> hidden
-      const qkv_proj = hidden_size * (q_lora_rank || 0) + 2 * hidden_size * (kv_lora_rank || 0)
-      const o_proj = hidden_size * hidden_size
-      attention_params = qkv_proj + o_proj
-      console.log(`   MLA attention: q_lora=${q_lora_rank}, kv_lora=${kv_lora_rank}`)
-    } else {
-      // Standard attention: 4 × hidden_size × hidden_size (Q, K, V, O projections)
-      attention_params = 4 * hidden_size * hidden_size
+    console.log(`📊 Extracted config: ${cfg.model_type}, layers=${cfg.L}, hidden=${cfg.hidden_size}, is_moe=${cfg.is_moe}`)
+    if (cfg.is_moe) {
+      console.log(`   MoE: ${cfg.total_routed_experts} routed + ${cfg.shared_experts} shared, ${cfg.active_routed_per_tok} active/tok`)
     }
 
-    let ffn_params: number
+    // Embedding params
+    const embedding_params = cfg.vocab_size * cfg.hidden_size
 
-    if (isMoE) {
-      // MoE model: Count ALL expert weights (vLLM loads all of them into GPU memory)
-      // Shared experts (always active)
-      const shared_ffn = n_shared_experts ? n_shared_experts * 2 * hidden_size * (moe_intermediate_size || intermediate_size) : 0
-      // ALL routed experts (loaded into GPU, even if only num_experts_per_tok are active per forward pass)
-      const routed_ffn = n_routed_experts * 2 * hidden_size * (moe_intermediate_size || intermediate_size)
-      ffn_params = shared_ffn + routed_ffn
-
-      console.log(`🔀 MoE detected: ${n_routed_experts} experts total (${num_experts_per_tok} active per token)`)
-      console.log(`   Shared FFN: ${(shared_ffn / 1e9).toFixed(2)}B params`)
-      console.log(`   Routed FFN (all experts): ${(routed_ffn / 1e9).toFixed(2)}B params (per layer)`)
-      console.log(`   Note: All ${n_routed_experts} experts loaded into GPU memory`)
+    // Attention params
+    let attention_params: number
+    if (cfg.kv_lora_rank) {
+      // MLA (Multi-head Latent Attention) - DeepSeek, GLM
+      // Note: This is a simplified estimate. Actual MLA has more parameters.
+      // For accurate sizing, we should fetch model.safetensors.index.json
+      attention_params = 4 * cfg.hidden_size * cfg.hidden_size
+      console.log(`   MLA detected (kv_lora=${cfg.kv_lora_rank}) - using standard attention estimate`)
     } else {
-      // Standard dense model
-      ffn_params = 2 * hidden_size * intermediate_size
+      // Standard attention
+      attention_params = 4 * cfg.hidden_size * cfg.hidden_size
+    }
+
+    // FFN params
+    let ffn_params: number
+    if (cfg.is_moe && cfg.total_routed_experts) {
+      // MoE: ALL expert weights (vLLM loads all into GPU)
+      const expert_size = cfg.moe_intermediate_size || cfg.intermediate_size
+      const shared_ffn = cfg.shared_experts * 2 * cfg.hidden_size * expert_size
+      const routed_ffn = cfg.total_routed_experts * 2 * cfg.hidden_size * expert_size
+      ffn_params = shared_ffn + routed_ffn
+      console.log(`   Shared FFN: ${(shared_ffn / 1e9).toFixed(2)}B, Routed: ${(routed_ffn / 1e9).toFixed(2)}B (per layer)`)
+    } else {
+      // Dense FFN
+      ffn_params = 2 * cfg.hidden_size * cfg.intermediate_size
     }
 
     const layer_params = attention_params + ffn_params
-    const total_params = embedding_params + (num_hidden_layers * layer_params) + embedding_params
-
+    const total_params = embedding_params + (cfg.L * layer_params) + embedding_params
     params_billions = total_params / 1e9
 
-    console.log(`📊 Estimated ${params_billions.toFixed(1)}B total parameters from HF config (${isMoE ? 'MoE' : 'dense'})`)
+    console.log(`📊 ${params_billions.toFixed(1)}B params (${cfg.is_moe ? 'MoE' : 'dense'})`)
   } else if (model) {
     // Extract parameter count from paramLabel (e.g., "70B" → 70)
     const paramMatch = model.paramLabel.match(/(\d+)B/)
