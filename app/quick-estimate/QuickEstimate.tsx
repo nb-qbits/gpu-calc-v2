@@ -109,6 +109,7 @@ export default function QuickEstimate() {
   const [showSaveModal, setShowSaveModal] = React.useState(false);
   const [savedCount, setSavedCount] = React.useState(0);
   const [showToast, setShowToast] = React.useState(false);
+  const [toastMessage, setToastMessage] = React.useState('');
 
   // Interactive controls
   const [testConcurrentUsers, setTestConcurrentUsers] = React.useState(97);
@@ -428,8 +429,113 @@ export default function QuickEstimate() {
     });
 
     setSavedCount(getSavedEstimateCount());
+    setToastMessage('saved');
     setShowToast(true);
     setTimeout(() => setShowToast(false), 5000);
+  };
+
+  // Copy API request body to clipboard
+  const handleCopyAPIRequest = async () => {
+    if (!testResult) return;
+
+    const apiRequest = {
+      model: {
+        model_id: model,
+        max_model_len: 'auto'
+      },
+      workload: {
+        isl_tokens: testISL,
+        osl_tokens: testOSL,
+        concurrent_users: testConcurrentUsers,
+        workload_type: testWorkloadType,
+        sla_priority: testSLAPriority
+      },
+      memory: {
+        weight_precision: testWeightPrecision.toLowerCase(),
+        kv_cache_precision: testKVCachePrecision.toLowerCase(),
+        gpu_memory_utilization: 0.90
+      },
+      gpu: {
+        gpu_type: mapGpuToCatalogId(gpu),
+        tp_size: testResult.memory_analysis.tp_size,
+        replicas: testResult.memory_analysis.replicas
+      }
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(apiRequest, null, 2));
+      setToastMessage('api-copied');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Copy CLI command to clipboard
+  const handleCopyCLICommand = async () => {
+    if (!testResult) return;
+
+    const cliCommand = `vllm serve ${model} \\
+  --tensor-parallel-size ${testResult.memory_analysis.tp_size} \\
+  --max-model-len auto \\
+  --gpu-memory-utilization 0.90 \\
+  --dtype ${testWeightPrecision.toLowerCase()} \\
+  --kv-cache-dtype ${testKVCachePrecision.toLowerCase()} \\
+  --max-num-seqs ${testResult.vllm_config?.max_num_seqs || 256}${testResult.vllm_config?.enable_chunked_prefill ? ' \\\n  --enable-chunked-prefill' : ''}`;
+
+    try {
+      await navigator.clipboard.writeText(cliCommand);
+      setToastMessage('cli-copied');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Export to Google Sheets (downloads as CSV)
+  const handleExportToSheets = () => {
+    if (!testResult || !catalogGpuForPricing) return;
+
+    // Prepare data in CSV format
+    const headers = [
+      'Model', 'GPU', 'GPUs Required', 'TP Size', 'Replicas',
+      'ISL', 'OSL', 'Concurrent Users', 'Workload Type', 'SLA Priority',
+      'Weight Precision', 'KV Cache Precision',
+      'Weight Memory (GB)', 'KV Cache Total (GB)', 'KV Category',
+      'Cloud Cost (Monthly)', 'Cloud Cost (5yr)',
+      'Self-Hosted Cost (Monthly)', 'Self-Hosted Cost (5yr)'
+    ];
+
+    const values = [
+      model, gpu, realGpuCount, testResult.memory_analysis.tp_size, testResult.memory_analysis.replicas,
+      testISL, testOSL, testConcurrentUsers, testWorkloadType, testSLAPriority,
+      testWeightPrecision, testKVCachePrecision,
+      testResult.memory_analysis.weight_gb.toFixed(1),
+      (testResult.memory_analysis.kv_cache_used_gb || 0).toFixed(1),
+      testResult.memory_analysis.kv_category_label || 'Standard Dense',
+      `$${realMonthlyCost.toLocaleString()}`, `$${(realMonthlyCost * 60).toLocaleString()}`,
+      `$${((catalogGpuForPricing.hardware_cost_usd * realGpuCount) / 60).toFixed(0)}`,
+      `$${(catalogGpuForPricing.hardware_cost_usd * realGpuCount).toLocaleString()}`
+    ];
+
+    const csvContent = headers.join(',') + '\n' + values.map(v => `"${v}"`).join(',');
+
+    // Download as CSV (can be imported into Google Sheets)
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `gpu-calc-estimate-${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setToastMessage('exported');
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
   };
 
   // Build accordion sections dynamically from current state
@@ -1345,11 +1451,17 @@ export default function QuickEstimate() {
 
       {/* ---------- footer actions ---------- */}
       <div className={styles.footerRow}>
-        <Button variant="secondary">Copy API request</Button>
-        <Button variant="secondary">Copy CLI command</Button>
-        <Button variant="secondary">Export to Sheets</Button>
+        <Button variant="secondary" onClick={handleCopyAPIRequest} isDisabled={!testResult}>
+          Copy API request
+        </Button>
+        <Button variant="secondary" onClick={handleCopyCLICommand} isDisabled={!testResult}>
+          Copy CLI command
+        </Button>
+        <Button variant="secondary" onClick={handleExportToSheets} isDisabled={!testResult}>
+          Export to Sheets
+        </Button>
         <span className={styles.footerSpacer} />
-        <Button variant="primary" onClick={() => setShowSaveModal(true)}>
+        <Button variant="primary" onClick={() => setShowSaveModal(true)} isDisabled={!testResult}>
           Save estimate{savedCount > 0 && ` (${savedCount})`}
         </Button>
       </div>
@@ -1381,7 +1493,14 @@ export default function QuickEstimate() {
           gap: '12px'
         }}>
           <CheckCircleIcon style={{ color: '#3d7317' }} />
-          <span>Estimate saved — <Link href="/compare" style={{ color: '#4da6ff', textDecoration: 'underline' }}>view in Compare →</Link></span>
+          <span>
+            {toastMessage === 'saved' && (
+              <>Estimate saved — <Link href="/compare" style={{ color: '#4da6ff', textDecoration: 'underline' }}>view in Compare →</Link></>
+            )}
+            {toastMessage === 'api-copied' && 'API request copied to clipboard'}
+            {toastMessage === 'cli-copied' && 'CLI command copied to clipboard'}
+            {toastMessage === 'exported' && 'CSV file downloaded — import into Google Sheets'}
+          </span>
         </div>
       )}
       <div className={styles.apiPreview}>
