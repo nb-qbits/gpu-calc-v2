@@ -16,7 +16,9 @@ export const InferenceConfigRequestSchema = z.object({
   workload_type: z.enum(['chat', 'web_search', 'rag', 'batch', 'coding']),
   sla_priority: z.enum(['ttft', 'tpot', 'throughput']),
   network_topology: z.enum(['nvlink', 'infiniband', 'ethernet']).optional(),
-  enable_llmd: z.boolean().optional()
+  enable_llmd: z.boolean().optional(),
+  hf_token: z.string().optional(),
+  kv_cache_precision: z.enum(['FP16', 'FP8']).optional()
 })
 
 export type InferenceConfigRequest = z.infer<typeof InferenceConfigRequestSchema>

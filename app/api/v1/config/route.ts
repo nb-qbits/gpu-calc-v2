@@ -7,6 +7,8 @@ import { InferenceConfigRequestSchema } from '@/lib/api/schemas'
 import { ApiErrors } from '@/lib/api/errors'
 import { formatInferenceConfigResponse } from '@/lib/api/responses'
 import { computeInferenceConfig } from '@/lib/gpu-math/inference-config'
+import { fetchModelConfig, type HFModelConfig } from '@/lib/huggingface/fetch-config'
+import type { InferenceRequest } from '@/lib/gpu-math/inference-config/types'
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,8 +16,35 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validatedData = InferenceConfigRequestSchema.parse(body)
 
+    // Fetch HuggingFace config server-side (with timeout)
+    let hf_config: HFModelConfig | undefined = undefined
+
+    // Always attempt fetch — token only needed for gated models
+    try {
+      const fetchResult = await Promise.race([
+        fetchModelConfig(validatedData.model_name, validatedData.hf_token),
+        new Promise<{success: false}>((resolve) =>
+          setTimeout(() => resolve({ success: false }), 8000)
+        )
+      ])
+
+      if (fetchResult.success && fetchResult.config) {
+        hf_config = fetchResult.config
+      }
+    } catch (e) {
+      // Non-fatal — fall back to catalog/estimation
+      // Do not log token or expose in errors
+      console.warn('HF config fetch failed for model:', validatedData.model_name)
+    }
+
+    // Build engine request with fetched config
+    const engineRequest: InferenceRequest = {
+      ...validatedData,
+      hf_config,
+    }
+
     // Compute inference configuration using the engine
-    const result = computeInferenceConfig(validatedData)
+    const result = computeInferenceConfig(engineRequest)
 
     // Return formatted response
     return NextResponse.json(formatInferenceConfigResponse(result), {
