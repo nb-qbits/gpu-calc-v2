@@ -1,10 +1,10 @@
 {
   "name": "gpu-calc",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/inject-build-metadata.js && next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",

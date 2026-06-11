@@ -25,6 +25,7 @@ import {
   CogIcon,
   ListIcon,
 } from "@patternfly/react-icons";
+import { getVersionString, getBuildTimeString, getShortCommit } from "@/lib/version";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -199,6 +200,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           </NavList>
         </Nav>
+
+        {/* Version Footer */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '12px 16px',
+          borderTop: '1px solid #2d2d2d',
+          fontSize: '11px',
+          fontFamily: 'var(--font-mono)',
+          color: 'rgba(255,255,255,0.4)',
+          lineHeight: '1.4'
+        }}>
+          <div>{getVersionString()} · {getShortCommit()}</div>
+          <div style={{ fontSize: '10px', marginTop: '2px' }}>
+            {getBuildTimeString()}
+          </div>
+        </div>
       </PageSidebarBody>
     </PageSidebar>
   );
