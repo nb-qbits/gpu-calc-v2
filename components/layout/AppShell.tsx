@@ -184,6 +184,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               isActive={pathname === "/hybrid-savings"}
             />
             <NavItemWithIcon
+              icon={CubesIcon}
+              label="Cluster cost"
+              href="/cluster-cost"
+              isActive={pathname === "/cluster-cost"}
+            />
+            <NavItemWithIcon
               icon={RouteIcon}
               label="Routing"
               href="/routing"
