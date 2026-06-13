@@ -581,8 +581,13 @@ export function computeInferenceConfig(
     // Need more replicas to distribute KV cache
     const required_replicas = Math.ceil(kv_cache_used_gb / kv_budget_per_replica_gb)
 
-    // If user manually set replicas, warn but don't override
-    if (req.manual_replicas !== undefined) {
+    // Check if user has ANY manual overrides active (parallelism or vLLM config)
+    const hasManualOverrides = req.manual_replicas !== undefined ||
+                                req.manual_tp_size !== undefined ||
+                                req.manual_gpu_memory_utilization !== undefined
+
+    // If user has manual overrides active, warn but don't force changes
+    if (hasManualOverrides) {
       validation.warnings.push(
         `⚠️ KV cache (${kv_cache_used_gb.toFixed(1)} GB) exceeds available memory (${(kv_budget_per_replica_gb * replicas).toFixed(1)} GB). ` +
         `Recommend increasing replicas from ${replicas} to ${required_replicas} (${tp_size * required_replicas} total GPUs).`
