@@ -106,6 +106,19 @@ export default function QuickEstimate() {
 
   // Collapsible state for "Want to change assumptions?" section
   const [assumptionsExpanded, setAssumptionsExpanded] = React.useState(false);
+  const [assumptionsHighlight, setAssumptionsHighlight] = React.useState(false);
+  const assumptionsRef = React.useRef<HTMLDivElement>(null);
+
+  // Manual override states
+  const [parallelismOverride, setParallelismOverride] = React.useState(false);
+  const [parallelismManualTP, setParallelismManualTP] = React.useState<number | null>(null);
+  const [parallelismManualReplicas, setParallelismManualReplicas] = React.useState<number | null>(null);
+  const [vllmOverride, setVllmOverride] = React.useState(false);
+  const [vllmManualMaxNumSeqs, setVllmManualMaxNumSeqs] = React.useState<number | null>(null);
+  const [vllmManualMaxModelLen, setVllmManualMaxModelLen] = React.useState<number | null>(null);
+  const [vllmManualChunkedPrefill, setVllmManualChunkedPrefill] = React.useState<boolean | null>(null);
+  const [vllmManualPrefixCaching, setVllmManualPrefixCaching] = React.useState<boolean | null>(null);
+  const [vllmManualGpuUtil, setVllmManualGpuUtil] = React.useState<number | null>(null);
 
   // Save estimate modal
   const [showSaveModal, setShowSaveModal] = React.useState(false);
@@ -224,7 +237,16 @@ export default function QuickEstimate() {
           osl: testOSL,
           workload_type: testWorkloadType,
           sla_priority: testSLAPriority,
-          hf_config: hfConfig || undefined  // Pass fetched config if available
+          hf_config: hfConfig || undefined,  // Pass fetched config if available
+          // Manual overrides for Parallelism
+          manual_tp_size: parallelismOverride && parallelismManualTP !== null ? parallelismManualTP : undefined,
+          manual_replicas: parallelismOverride && parallelismManualReplicas !== null ? parallelismManualReplicas : undefined,
+          // Manual overrides for vLLM config
+          manual_max_num_seqs: vllmOverride && vllmManualMaxNumSeqs !== null ? vllmManualMaxNumSeqs : undefined,
+          manual_max_model_len: vllmOverride && vllmManualMaxModelLen !== null ? vllmManualMaxModelLen : undefined,
+          manual_enable_chunked_prefill: vllmOverride && vllmManualChunkedPrefill !== null ? vllmManualChunkedPrefill : undefined,
+          manual_enable_prefix_caching: vllmOverride && vllmManualPrefixCaching !== null ? vllmManualPrefixCaching : undefined,
+          manual_gpu_memory_utilization: vllmOverride && vllmManualGpuUtil !== null ? vllmManualGpuUtil / 100 : undefined  // Convert percentage to 0-1
         });
         setTestResult(result);
         setTestError(null);
@@ -241,7 +263,7 @@ export default function QuickEstimate() {
 
     // Cleanup timeout on unmount or dependency change
     return () => clearTimeout(timer);
-  }, [model, gpu, testConcurrentUsers, testISL, testOSL, testWorkloadType, testSLAPriority, testWeightPrecision, testKVCachePrecision, hfConfig, isFetchingConfig]);
+  }, [model, gpu, testConcurrentUsers, testISL, testOSL, testWorkloadType, testSLAPriority, testWeightPrecision, testKVCachePrecision, hfConfig, isFetchingConfig, parallelismOverride, parallelismManualTP, parallelismManualReplicas, vllmOverride, vllmManualMaxNumSeqs, vllmManualMaxModelLen, vllmManualChunkedPrefill, vllmManualPrefixCaching, vllmManualGpuUtil]);
 
   // Fetch live pricing from Cloudflare Worker
   React.useEffect(() => {
@@ -284,6 +306,22 @@ export default function QuickEstimate() {
     }
   }, []);
 
+  // Reset overrides when major inputs change (model or GPU selection)
+  React.useEffect(() => {
+    if (parallelismOverride || vllmOverride) {
+      setParallelismOverride(false);
+      setParallelismManualTP(null);
+      setParallelismManualReplicas(null);
+      setVllmOverride(false);
+      setVllmManualMaxNumSeqs(null);
+      setVllmManualMaxModelLen(null);
+      setVllmManualChunkedPrefill(null);
+      setVllmManualPrefixCaching(null);
+      setVllmManualGpuUtil(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, gpu]);
+
   const toggleAcc = (id: string) => {
     setExpanded((e) => (e.includes(id) ? e.filter((x) => x !== id) : [...e, id]));
 
@@ -294,6 +332,24 @@ export default function QuickEstimate() {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }, 100);
+  };
+
+  const handleCustomizeClick = () => {
+    // Expand assumptions section if collapsed
+    if (!assumptionsExpanded) {
+      setAssumptionsExpanded(true);
+    }
+
+    // Scroll to assumptions section
+    setTimeout(() => {
+      if (assumptionsRef.current) {
+        assumptionsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+
+    // Add highlight pulse animation
+    setAssumptionsHighlight(true);
+    setTimeout(() => setAssumptionsHighlight(false), 2000);
   };
 
   // Debounced search query
@@ -555,6 +611,41 @@ export default function QuickEstimate() {
     setTimeout(() => setShowToast(false), 3000);
   };
 
+  // Validation warnings for manual overrides
+  const getValidationWarnings = (): string[] => {
+    const warnings: string[] = [];
+
+    if (parallelismOverride) {
+      if (parallelismManualTP !== null) {
+        // TP must be power of 2
+        if (parallelismManualTP <= 0) {
+          warnings.push('Parallelism: Tensor parallel size must be > 0');
+        } else if ((parallelismManualTP & (parallelismManualTP - 1)) !== 0) {
+          warnings.push('Parallelism: Tensor parallel size should be a power of 2 (1, 2, 4, 8, 16)');
+        }
+      }
+      if (parallelismManualReplicas !== null && parallelismManualReplicas <= 0) {
+        warnings.push('Parallelism: Replica count must be > 0');
+      }
+    }
+
+    if (vllmOverride) {
+      if (vllmManualMaxNumSeqs !== null && vllmManualMaxNumSeqs <= 0) {
+        warnings.push('vLLM: max_num_seqs must be > 0');
+      }
+      if (vllmManualMaxModelLen !== null && vllmManualMaxModelLen <= 0) {
+        warnings.push('vLLM: max_model_len must be > 0');
+      }
+      if (vllmManualGpuUtil !== null && (vllmManualGpuUtil < 50 || vllmManualGpuUtil > 95)) {
+        warnings.push('vLLM: gpu_memory_utilization should be between 50-95%');
+      }
+    }
+
+    return warnings;
+  };
+
+  const validationWarnings = getValidationWarnings();
+
   // Build accordion sections dynamically from current state
   const buildAccordionSections = () => [
     {
@@ -649,63 +740,131 @@ export default function QuickEstimate() {
       ],
     },
     {
-      id: 'parallel', title: 'Parallelism', badge: 'Auto-computed', badgeColor: 'blue',
+      id: 'parallel',
+      title: 'Parallelism',
+      badge: parallelismOverride ? 'Manual override' : 'Auto-computed',
+      badgeColor: parallelismOverride ? 'orange' : 'blue',
+      hasOverride: true,
+      isOverridden: parallelismOverride,
+      onOverrideToggle: () => {
+        if (parallelismOverride) {
+          // Reset to auto
+          setParallelismOverride(false);
+          setParallelismManualTP(null);
+          setParallelismManualReplicas(null);
+        } else {
+          // Enable manual override - initialize with current computed values
+          setParallelismOverride(true);
+          if (testResult) {
+            setParallelismManualTP(testResult.memory_analysis.tp_size);
+            setParallelismManualReplicas(testResult.memory_analysis.replicas);
+          }
+        }
+      },
       summary: [
-        { k: 'TP', v: testResult ? `${testResult.memory_analysis.tp_size}` : '—' },
-        { k: 'replicas', v: testResult ? `${testResult.memory_analysis.replicas}` : '—' }
+        { k: 'TP', v: parallelismOverride && parallelismManualTP ? `${parallelismManualTP}` : testResult ? `${testResult.memory_analysis.tp_size}` : '—' },
+        { k: 'replicas', v: parallelismOverride && parallelismManualReplicas ? `${parallelismManualReplicas}` : testResult ? `${testResult.memory_analysis.replicas}` : '—' }
       ],
       fields: [
         {
           label: 'Tensor parallel size',
-          value: testResult ? `${testResult.memory_analysis.tp_size}` : '—',
+          value: parallelismOverride && parallelismManualTP !== null ? `${parallelismManualTP}` : testResult ? `${testResult.memory_analysis.tp_size}` : '—',
           term: 'tensorParallel',
-          readonly: true
+          readonly: !parallelismOverride,
+          type: parallelismOverride ? 'number' as const : undefined,
+          onChange: parallelismOverride ? (val: string) => setParallelismManualTP(parseInt(val) || 1) : undefined
         },
         {
           label: 'Replica count',
-          value: testResult ? `${testResult.memory_analysis.replicas}` : '—',
-          readonly: true
+          value: parallelismOverride && parallelismManualReplicas !== null ? `${parallelismManualReplicas}` : testResult ? `${testResult.memory_analysis.replicas}` : '—',
+          readonly: !parallelismOverride,
+          type: parallelismOverride ? 'number' as const : undefined,
+          onChange: parallelismOverride ? (val: string) => setParallelismManualReplicas(parseInt(val) || 1) : undefined
         },
         {
           label: 'Total GPUs',
-          value: testResult ? `${testResult.memory_analysis.tp_size * testResult.memory_analysis.replicas}` : '—',
+          value: parallelismOverride && parallelismManualTP !== null && parallelismManualReplicas !== null
+            ? `${parallelismManualTP * parallelismManualReplicas}`
+            : testResult ? `${testResult.memory_analysis.tp_size * testResult.memory_analysis.replicas}` : '—',
           readonly: true
         },
       ],
     },
     {
-      id: 'engine', title: 'vLLM config', badge: 'Auto-computed', badgeColor: 'blue',
+      id: 'engine',
+      title: 'vLLM config',
+      badge: vllmOverride ? 'Manual override' : 'Auto-computed',
+      badgeColor: vllmOverride ? 'orange' : 'blue',
+      hasOverride: true,
+      isOverridden: vllmOverride,
+      onOverrideToggle: () => {
+        if (vllmOverride) {
+          // Reset to auto
+          setVllmOverride(false);
+          setVllmManualMaxNumSeqs(null);
+          setVllmManualMaxModelLen(null);
+          setVllmManualChunkedPrefill(null);
+          setVllmManualPrefixCaching(null);
+          setVllmManualGpuUtil(null);
+        } else {
+          // Enable manual override - initialize with current computed values
+          setVllmOverride(true);
+          if (testResult) {
+            setVllmManualMaxNumSeqs(testResult.vllm_config.max_num_seqs);
+            setVllmManualMaxModelLen(testResult.vllm_config.max_model_len);
+            setVllmManualChunkedPrefill(testResult.vllm_config.enable_chunked_prefill);
+            setVllmManualPrefixCaching(testResult.vllm_config.enable_prefix_caching);
+            setVllmManualGpuUtil(Math.round(testResult.vllm_config.gpu_memory_utilization * 100));
+          }
+        }
+      },
       summary: [
-        { k: 'max_num_seqs', v: testResult ? `${testResult.vllm_config.max_num_seqs}` : '—' },
-        { k: 'chunked', v: testResult ? (testResult.vllm_config.enable_chunked_prefill ? 'on' : 'off') : '—' }
+        { k: 'max_num_seqs', v: vllmOverride && vllmManualMaxNumSeqs !== null ? `${vllmManualMaxNumSeqs}` : testResult ? `${testResult.vllm_config.max_num_seqs}` : '—' },
+        { k: 'chunked', v: vllmOverride && vllmManualChunkedPrefill !== null ? (vllmManualChunkedPrefill ? 'on' : 'off') : testResult ? (testResult.vllm_config.enable_chunked_prefill ? 'on' : 'off') : '—' }
       ],
       fields: [
         {
           label: 'max_num_seqs',
-          value: testResult ? `${testResult.vllm_config.max_num_seqs}` : '—',
+          value: vllmOverride && vllmManualMaxNumSeqs !== null ? `${vllmManualMaxNumSeqs}` : testResult ? `${testResult.vllm_config.max_num_seqs}` : '—',
           term: 'maxNumSeqs',
-          readonly: true
+          readonly: !vllmOverride,
+          type: vllmOverride ? 'number' as const : undefined,
+          onChange: vllmOverride ? (val: string) => setVllmManualMaxNumSeqs(parseInt(val) || 1) : undefined
         },
         {
           label: 'max_model_len',
-          value: testResult ? `${testResult.vllm_config.max_model_len}` : '—',
-          readonly: true
+          value: vllmOverride && vllmManualMaxModelLen !== null ? `${vllmManualMaxModelLen}` : testResult ? `${testResult.vllm_config.max_model_len}` : '—',
+          readonly: !vllmOverride,
+          type: vllmOverride ? 'number' as const : undefined,
+          onChange: vllmOverride ? (val: string) => setVllmManualMaxModelLen(parseInt(val) || 1) : undefined
         },
         {
           label: 'enable_chunked_prefill',
-          value: testResult ? (testResult.vllm_config.enable_chunked_prefill ? 'Yes' : 'No') : '—',
-          readonly: true
+          value: vllmOverride && vllmManualChunkedPrefill !== null ? (vllmManualChunkedPrefill ? 'Yes' : 'No') : testResult ? (testResult.vllm_config.enable_chunked_prefill ? 'Yes' : 'No') : '—',
+          readonly: !vllmOverride,
+          type: vllmOverride ? 'select' as const : undefined,
+          options: vllmOverride ? ['Yes', 'No'] : undefined,
+          onChange: vllmOverride ? (val: string) => setVllmManualChunkedPrefill(val === 'Yes') : undefined
         },
         {
           label: 'enable_prefix_caching',
-          value: testResult ? (testResult.vllm_config.enable_prefix_caching ? 'Yes' : 'No') : '—',
-          readonly: true
+          value: vllmOverride && vllmManualPrefixCaching !== null ? (vllmManualPrefixCaching ? 'Yes' : 'No') : testResult ? (testResult.vllm_config.enable_prefix_caching ? 'Yes' : 'No') : '—',
+          readonly: !vllmOverride,
+          type: vllmOverride ? 'select' as const : undefined,
+          options: vllmOverride ? ['Yes', 'No'] : undefined,
+          onChange: vllmOverride ? (val: string) => setVllmManualPrefixCaching(val === 'Yes') : undefined
         },
         {
           label: 'gpu_memory_utilization',
-          value: testResult ? `${(testResult.vllm_config.gpu_memory_utilization * 100).toFixed(0)}%` : '—',
+          value: vllmOverride && vllmManualGpuUtil !== null ? `${vllmManualGpuUtil}%` : testResult ? `${(testResult.vllm_config.gpu_memory_utilization * 100).toFixed(0)}%` : '—',
           term: 'gpuUtil',
-          readonly: true
+          readonly: !vllmOverride,
+          type: vllmOverride ? 'range' as const : undefined,
+          min: vllmOverride ? 50 : undefined,
+          max: vllmOverride ? 95 : undefined,
+          step: vllmOverride ? 5 : undefined,
+          rangeValue: vllmOverride && vllmManualGpuUtil !== null ? vllmManualGpuUtil : undefined,
+          onChange: vllmOverride ? (val: number) => setVllmManualGpuUtil(val) : undefined
         },
       ],
     },
@@ -869,9 +1028,11 @@ export default function QuickEstimate() {
         <ExclamationTriangleIcon style={{ color: 'var(--gc-warn, #f0ab00)', flexShrink: 0 }} />
         <span>
           Based on your configuration — ISL {testISL}, OSL {testOSL}, {testKVCachePrecision} KV cache,
-          {' '}{testConcurrentUsers} concurrent users. Edit settings in accordion below to customize.
+          {' '}{testConcurrentUsers} concurrent users.
         </span>
-        <button className={styles.warnLink} onClick={() => toggleAcc('workload')}>Customize →</button>
+        <button className={styles.warnLink} onClick={handleCustomizeClick}>
+          Customize? (Expand &apos;Assumptions&apos; section below)
+        </button>
       </div>
 
       {/* ---------- search ---------- */}
@@ -929,6 +1090,32 @@ export default function QuickEstimate() {
                 💡 <strong>Tip:</strong> Add a HuggingFace token above for accurate results with gated models.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ---------- validation warnings ---------- */}
+      {validationWarnings.length > 0 && (
+        <div style={{
+          padding: '16px 20px',
+          marginBottom: '20px',
+          background: '#fff8e1',
+          border: '2px solid #f0ab00',
+          borderRadius: '8px',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'flex-start'
+        }}>
+          <ExclamationTriangleIcon style={{ fontSize: '24px', color: '#f0ab00', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: '600', color: '#795600', marginBottom: '8px', fontSize: '16px' }}>
+              Manual override validation warnings
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '14px', color: '#795600', lineHeight: '1.6' }}>
+              {validationWarnings.map((warning, i) => (
+                <li key={i}>{warning}</li>
+              ))}
+            </ul>
           </div>
         </div>
       )}
@@ -1385,7 +1572,8 @@ export default function QuickEstimate() {
 
       {/* ---------- assumptions ---------- */}
       <div
-        className={styles.assumptionsHead}
+        ref={assumptionsRef}
+        className={`${styles.assumptionsHead} ${assumptionsHighlight ? styles.assumptionsHighlight : ''}`}
         data-tour="assumptions"
         onClick={() => setAssumptionsExpanded(!assumptionsExpanded)}
         style={{
@@ -1394,10 +1582,11 @@ export default function QuickEstimate() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '12px 0'
+          padding: '12px 0',
+          borderRadius: '4px'
         }}
-        onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
-        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+        onMouseEnter={(e) => !assumptionsHighlight && (e.currentTarget.style.background = '#f5f5f5')}
+        onMouseLeave={(e) => !assumptionsHighlight && (e.currentTarget.style.background = 'transparent')}
       >
         <span className={styles.assumptionsTitle}>Want to change assumptions?</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1434,9 +1623,22 @@ export default function QuickEstimate() {
                   isExpanded={expanded.includes(sec.id)}
                   onClick={() => toggleAcc(sec.id)}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', width: '100%' }}>
                     <span className={styles.cardTitle} style={{ fontSize: 16 }}>{sec.title}</span>
                     {'badge' in sec && sec.badge ? <Label isCompact color={sec.badgeColor as any}>{sec.badge}</Label> : null}
+                    {'hasOverride' in sec && sec.hasOverride && (
+                      <Button
+                        variant="link"
+                        isInline
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          sec.onOverrideToggle?.();
+                        }}
+                        style={{ fontSize: '13px', marginLeft: 'auto', padding: '4px 8px' }}
+                      >
+                        {sec.isOverridden ? '↺ Reset to auto' : '✎ Override'}
+                      </Button>
+                    )}
                     {!expanded.includes(sec.id) && (
                       <span className={styles.accSummary}>
                         {sec.summary.map((p) => (
@@ -1469,7 +1671,7 @@ export default function QuickEstimate() {
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                               <span style={{ fontSize: '13px', fontWeight: '600', fontFamily: 'var(--mono)' }}>
-                                {f.value}
+                                {f.rangeValue !== undefined ? `${f.rangeValue}%` : f.value}
                               </span>
                             </div>
                             <input
@@ -1477,11 +1679,18 @@ export default function QuickEstimate() {
                               min={f.min}
                               max={f.max}
                               step={f.step}
-                              value={f.value}
+                              value={f.rangeValue !== undefined ? f.rangeValue : (typeof f.value === 'string' ? parseInt(f.value) : f.value)}
                               onChange={(e) => f.onChange?.(Number(e.target.value))}
                               style={{ width: '100%' }}
                             />
                           </div>
+                        ) : f.type === 'number' ? (
+                          <TextInput
+                            value={String(f.value)}
+                            aria-label={f.label}
+                            type="number"
+                            onChange={(_, val) => f.onChange?.(val)}
+                          />
                         ) : (
                           <TextInput
                             value={String(f.value)}

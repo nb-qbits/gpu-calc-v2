@@ -688,11 +688,31 @@
   }
 }
 
+/* assumptions highlight animation */
+.assumptionsHighlight {
+  animation: highlightPulse 2s ease-out;
+}
+
+@keyframes highlightPulse {
+  0% {
+    background: transparent;
+  }
+  10% {
+    background: #fff8c5;
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 /* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .flipFace, .driverBarFill, .memSeg { transition: none; }
   .tourBeacon {
     animation: none;
     transform: none;
+  }
+  .assumptionsHighlight {
+    animation: none;
   }
 }

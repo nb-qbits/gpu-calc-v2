@@ -248,8 +248,23 @@ export function computeInferenceConfig(
   const estimated_tp_for_utilization = Math.max(1, Math.ceil(weight_gb / (gpu.vramGb * 0.90)))
   const estimated_weight_per_gpu = weight_gb / estimated_tp_for_utilization
 
-  const { usable_gb, utilization } = computeUsableHBM(gpu.vramGb, estimated_weight_per_gpu)
-  const tp_size = computeTensorParallelSize(weight_gb, usable_gb)
+  // If manual GPU utilization is provided, use it directly
+  let utilization: number
+  let usable_gb: number
+
+  if (req.manual_gpu_memory_utilization !== undefined) {
+    utilization = req.manual_gpu_memory_utilization
+    usable_gb = gpu.vramGb * utilization
+    console.log(`🔧 Manual GPU utilization override: ${(utilization * 100).toFixed(0)}% → ${usable_gb.toFixed(1)} GB usable (out of ${gpu.vramGb} GB)`)
+  } else {
+    const result = computeUsableHBM(gpu.vramGb, estimated_weight_per_gpu)
+    usable_gb = result.usable_gb
+    utilization = result.utilization
+    console.log(`⚙️ Auto GPU utilization: ${(utilization * 100).toFixed(0)}% → ${usable_gb.toFixed(1)} GB usable (out of ${gpu.vramGb} GB)`)
+  }
+
+  // Use manual TP size if provided, otherwise compute it
+  const tp_size = req.manual_tp_size || computeTensorParallelSize(weight_gb, usable_gb)
   const weight_gb_per_gpu = weight_gb / tp_size
 
   // Determine GPU count
@@ -264,7 +279,8 @@ export function computeInferenceConfig(
     gpu_count = tp_size
   }
 
-  let replicas = computeReplicas(gpu_count, tp_size)
+  // Use manual replicas if provided, otherwise compute it
+  let replicas = req.manual_replicas || computeReplicas(gpu_count, tp_size)
 
   // Warn if only 1 replica (no fault tolerance)
   if (replicas === 1) {
@@ -564,14 +580,24 @@ export function computeInferenceConfig(
   if (kv_cache_per_replica > kv_budget_per_replica_gb) {
     // Need more replicas to distribute KV cache
     const required_replicas = Math.ceil(kv_cache_used_gb / kv_budget_per_replica_gb)
-    const old_replicas = replicas
-    replicas = required_replicas
-    gpu_count = tp_size * replicas
 
-    validation.warnings.push(
-      `KV cache (${kv_cache_used_gb.toFixed(1)} GB) exceeds available memory. ` +
-      `Increased replicas from ${old_replicas} to ${replicas} (${gpu_count} total GPUs).`
-    )
+    // If user manually set replicas, warn but don't override
+    if (req.manual_replicas !== undefined) {
+      validation.warnings.push(
+        `⚠️ KV cache (${kv_cache_used_gb.toFixed(1)} GB) exceeds available memory (${(kv_budget_per_replica_gb * replicas).toFixed(1)} GB). ` +
+        `Recommend increasing replicas from ${replicas} to ${required_replicas} (${tp_size * required_replicas} total GPUs).`
+      )
+    } else {
+      // Auto mode: increase replicas automatically
+      const old_replicas = replicas
+      replicas = required_replicas
+      gpu_count = tp_size * replicas
+
+      validation.warnings.push(
+        `KV cache (${kv_cache_used_gb.toFixed(1)} GB) exceeds available memory. ` +
+        `Increased replicas from ${old_replicas} to ${replicas} (${gpu_count} total GPUs).`
+      )
+    }
   }
 
   // Calculate total KV budget and max sequences with final replica count
@@ -596,12 +622,29 @@ export function computeInferenceConfig(
 
   // ═══ STEP 7: COMPUTE VLLM CONFIG ═══
 
-  const vllm_config = computeVLLMConfig(req, {
+  let vllm_config = computeVLLMConfig(req, {
     tp_size,
     replicas,
     max_sequences_from_memory,
     gpu_memory_utilization: utilization
   })
+
+  // Apply manual overrides to vLLM config if provided
+  if (req.manual_max_num_seqs !== undefined) {
+    vllm_config.max_num_seqs = req.manual_max_num_seqs
+  }
+  if (req.manual_max_model_len !== undefined) {
+    vllm_config.max_model_len = req.manual_max_model_len
+  }
+  if (req.manual_enable_chunked_prefill !== undefined) {
+    vllm_config.enable_chunked_prefill = req.manual_enable_chunked_prefill
+  }
+  if (req.manual_enable_prefix_caching !== undefined) {
+    vllm_config.enable_prefix_caching = req.manual_enable_prefix_caching
+  }
+  if (req.manual_gpu_memory_utilization !== undefined) {
+    vllm_config.gpu_memory_utilization = req.manual_gpu_memory_utilization
+  }
 
   // ═══ STEP 8: CLASSIFY BOTTLENECK ═══
 

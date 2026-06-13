@@ -21,6 +21,17 @@ export interface InferenceRequest {
 
   // Optional: provide fetched HuggingFace config directly
   hf_config?: HFModelConfig
+
+  // Manual overrides for Parallelism
+  manual_tp_size?: number
+  manual_replicas?: number
+
+  // Manual overrides for vLLM config
+  manual_max_num_seqs?: number
+  manual_max_model_len?: number
+  manual_enable_chunked_prefill?: boolean
+  manual_enable_prefix_caching?: boolean
+  manual_gpu_memory_utilization?: number  // 0.0-1.0 (will be converted from percentage)
 }
 
 export interface MemoryAnalysis {
