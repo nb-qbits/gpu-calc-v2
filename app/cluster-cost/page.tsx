@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './cluster-cost.module.css'
+import { fetchAllProviders, getEffectiveRate, loadUserOverrides, setUserOverride, clearUserOverride, loadSelectedGpus, saveSelectedGpu, type Provider } from '@/lib/pricing/providerPricing'
 
 // GPU Catalog - matches reference exactly
 const GPU_CATALOG = [
@@ -16,30 +17,32 @@ const GPU_CATALOG = [
 // Backend defaults - all rates come from here
 const BACKEND_DEFAULTS = {
   cloud: {
-    storHot: 250,
+    storHot: 165,
     storWarm: 100,
     storCold: 25,
-    egress: 75,
-    ctrlBase: 900,
+    egress: 90,
+    ctrlBase: 2000,
     ctrlPerGpu: 14,
-    supFrac: 0.04,
+    supFrac: 0.09,
     opsFix: 1000,
     opsDbg: 1200,
     opsDbgGpu: 9,
   },
   onprem: {
-    deprYrs: 4,
+    deprYrs: 5,
     powerKwh: 0.10,
-    pue: 1.40,
-    coloKwMo: 150,
+    pue: 1.25,
+    coloKwMo: 250,
     netCapexPerGpu: 12000,
     netAmortYrs: 3,
     staffAnnual: 200000,
-    staffPerFte: 4,
-    supFrac: 0.12,
+    staffPerFte: 2.5,
+    supFrac: 0.18,
     storHot: 150,
     storWarm: 60,
     storCold: 15,
+    ctrlBase: 300,
+    ctrlPerGpu: 10,
   },
   dr: {
     cloudFactor: 0.35,
@@ -78,6 +81,7 @@ interface License {
   name: string
   amount: number
   cycle: 'yr' | 'mo'
+  scope: 'both' | 'cloud' | 'onprem'
 }
 
 interface CalcResult {
@@ -94,7 +98,8 @@ function calcCloud(
   clusters: Cluster[],
   licMonthly: number,
   dr: boolean,
-  rates: typeof BACKEND_DEFAULTS
+  rates: typeof BACKEND_DEFAULTS,
+  activeGpuRate = 0
 ): CalcResult {
   let gpuCostTotal = 0
   let totalGPUs = 0
@@ -110,7 +115,8 @@ function calcCloud(
     let ngpus = 0
     cl.nodeGroups.forEach(ng => {
       const g = GPU_CATALOG.find(x => x.id === ng.gpuType) || GPU_CATALOG[1]
-      gpuCost += ng.count * g.rate * 720
+      const rate = activeGpuRate > 0 ? activeGpuRate : g.rate
+      gpuCost += ng.count * rate * 720
       ngpus += ng.count
     })
     const stor = cl.hotTB * r.storHot + cl.warmTB * r.storWarm + cl.coldTB * r.storCold
@@ -201,7 +207,7 @@ function calcOnPrem(
     const staff = r.staffAnnual / r.staffPerFte / 12
     const sup = gpuCapex * r.supFrac / 12
     const ops = staff + sup
-    const ctrl = 300 + ngpus * 10
+    const ctrl = r.ctrlBase + ngpus * r.ctrlPerGpu
 
     gpuAmortTotal += gpuAmort
     powerTotal += power
@@ -442,6 +448,15 @@ export default function ClusterCostPage() {
   const [rates, setRates] = useState(JSON.parse(JSON.stringify(BACKEND_DEFAULTS)))
   const [toast, setToast] = useState<string | null>(null)
 
+  // Cloud provider pricing state
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [activeProviderId, setActiveProviderId] = useState('gcp')
+  const [selectedGpus, setSelectedGpus] = useState<Record<string, string>>({})
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number | undefined>>({})
+  const [providerOpen, setProviderOpen] = useState(false)
+  const [providerError, setProviderError] = useState<string | null>(null)
+  const [providerLoading, setProviderLoading] = useState(true)
+
   // Panel resize state with localStorage persistence
   const [cols, setCols] = useState<[number, number]>(() => {
     if (typeof window !== 'undefined') {
@@ -465,6 +480,26 @@ export default function ClusterCostPage() {
   useEffect(() => {
     localStorage.setItem('cluster-cost-col-widths', JSON.stringify(cols))
   }, [cols])
+
+  // Load cloud providers on mount
+  useEffect(() => {
+    loadProviders()
+  }, [])
+
+  const loadProviders = async () => {
+    setProviderLoading(true)
+    try {
+      const data = await fetchAllProviders()
+      setProviders(data)
+      setSelectedGpus(loadSelectedGpus(data))
+      setPriceOverrides(loadUserOverrides())
+      setProviderError(data.length === 0 ? 'Could not reach pricing worker' : null)
+    } catch (error) {
+      setProviderError('Failed to load provider data')
+    } finally {
+      setProviderLoading(false)
+    }
+  }
 
   const startDrag = useCallback((colIndex: number, e: React.MouseEvent) => {
     e.preventDefault()
@@ -503,17 +538,41 @@ export default function ClusterCostPage() {
     window.addEventListener('mouseup', onUp)
   }, [cols])
 
-  const licMonthly = useMemo(
+  // Calculate license costs split by scope
+  const licCloud = useMemo(
     () =>
-      licenses.reduce((s, l) => {
-        const annual = l.cycle === 'yr' ? l.amount * 12 : l.amount
-        return s + (isNaN(annual) ? 0 : annual / 12)
-      }, 0),
+      licenses
+        .filter(l => l.scope !== 'onprem')
+        .reduce((s, l) => {
+          const annual = l.cycle === 'yr' ? l.amount * 12 : l.amount
+          return s + (isNaN(annual) ? 0 : annual / 12)
+        }, 0),
     [licenses]
   )
 
-  const cloud = useMemo(() => calcCloud(clusters, licMonthly, dr, rates), [clusters, licMonthly, dr, rates])
-  const onprem = useMemo(() => calcOnPrem(clusters, licMonthly, dr, rates), [clusters, licMonthly, dr, rates])
+  const licOnPrem = useMemo(
+    () =>
+      licenses
+        .filter(l => l.scope !== 'cloud')
+        .reduce((s, l) => {
+          const annual = l.cycle === 'yr' ? l.amount * 12 : l.amount
+          return s + (isNaN(annual) ? 0 : annual / 12)
+        }, 0),
+    [licenses]
+  )
+
+  const licMonthly = licCloud + licOnPrem
+
+  // Calculate active GPU rate from provider pricing
+  const activeProvider = providers.find(p => p.id === activeProviderId) || providers[0]
+  const activeGpu = selectedGpus[activeProviderId] || activeProvider?.gpus[0]?.model || ''
+  const activeGpuRate = activeProvider ? getEffectiveRate(activeProviderId, activeGpu, providers, priceOverrides) : null
+
+  const cloud = useMemo(
+    () => calcCloud(clusters, licCloud, dr, rates, activeGpuRate || 0),
+    [clusters, licCloud, dr, rates, activeGpuRate]
+  )
+  const onprem = useMemo(() => calcOnPrem(clusters, licOnPrem, dr, rates), [clusters, licOnPrem, dr, rates])
 
   useParticles(cloudRef, cloud.breakdown)
   useParticles(onpremRef, onprem.breakdown)
@@ -555,7 +614,7 @@ export default function ClusterCostPage() {
       nodeGroups: c.nodeGroups.length > 1 ? c.nodeGroups.filter((_, j) => j !== i) : c.nodeGroups,
     }))
 
-  const addLicense = () => setLicenses(ls => [...ls, { id: Date.now(), name: '', amount: 0, cycle: 'yr' }])
+  const addLicense = () => setLicenses(ls => [...ls, { id: Date.now(), name: '', amount: 0, cycle: 'yr', scope: 'both' }])
   const upLic = (id: number, k: keyof License, v: any) => setLicenses(ls => ls.map(l => (l.id === id ? { ...l, [k]: v } : l)))
   const rmLic = (id: number) => setLicenses(ls => ls.filter(l => l.id !== id))
 
@@ -611,13 +670,19 @@ export default function ClusterCostPage() {
     rows.push([''])
 
     // Section 3: Licenses
-    if (licenses.length > 0 || licMonthly > 0) {
-      rows.push(['LICENSES', 'Annual', 'Monthly'])
+    if (licenses.length > 0 || licCloud > 0 || licOnPrem > 0) {
+      rows.push(['LICENSES', 'Annual', 'Monthly', 'Scope'])
       licenses.forEach(l => {
         const a = l.cycle === 'yr' ? l.amount * 12 : l.amount
-        rows.push([l.name || '(unnamed)', '$' + Math.round(a), '$' + Math.round(a / 12)])
+        const scopeLabel = l.scope === 'cloud' ? 'Cloud only' : l.scope === 'onprem' ? 'On-prem only' : 'Both'
+        rows.push([l.name || '(unnamed)', '$' + Math.round(a), '$' + Math.round(a / 12), scopeLabel])
       })
-      rows.push(['Total licenses', '$' + Math.round(licMonthly * 12), '$' + Math.round(licMonthly)])
+      if (licCloud > 0) {
+        rows.push(['☁ Cloud total', '$' + Math.round(licCloud * 12), '$' + Math.round(licCloud), ''])
+      }
+      if (licOnPrem > 0) {
+        rows.push(['🖥 On-prem total', '$' + Math.round(licOnPrem * 12), '$' + Math.round(licOnPrem), ''])
+      }
       rows.push([''])
     }
 
@@ -626,7 +691,7 @@ export default function ClusterCostPage() {
       rows.push(['CLUSTERS', 'GPUs', 'Cloud/mo', 'Self-hosted/mo'])
       clusters.forEach(cl => {
         const gpus = cl.nodeGroups.reduce((s, ng) => s + ng.count, 0)
-        const cCloud = calcCloud([cl], 0, false, rates).total
+        const cCloud = calcCloud([cl], 0, false, rates, activeGpuRate || 0).total
         const cOp = calcOnPrem([cl], 0, false, rates).total
         rows.push([cl.name, gpus.toString(), '$' + Math.round(cCloud), '$' + Math.round(cOp)])
       })
@@ -651,9 +716,15 @@ export default function ClusterCostPage() {
     ['powerKwh', 'Power rate', '$/kWh'],
     ['pue', 'PUE', '×'],
     ['coloKwMo', 'Colo/rack', '$/kW/mo'],
+    ['netCapexPerGpu', 'Networking CAPEX', '$/gpu'],
     ['staffAnnual', 'Staff loaded', '$/yr'],
     ['staffPerFte', 'Clusters/FTE', ''],
     ['supFrac', 'Support/warranty', '%/yr'],
+    ['storHot', 'Storage hot', '$/TB/mo'],
+    ['storWarm', 'Storage warm', '$/TB/mo'],
+    ['storCold', 'Storage cold', '$/TB/mo'],
+    ['ctrlBase', 'Control base', '$/mo'],
+    ['ctrlPerGpu', 'Control per GPU', '$/mo/gpu'],
   ]
 
   return (
@@ -786,6 +857,160 @@ export default function ClusterCostPage() {
           </button>
         </div>
 
+        {/* Cloud provider pricing */}
+        <div className={styles.ps}>
+          <div
+            className={styles.pst}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+            onClick={() => setProviderOpen(o => !o)}
+          >
+            <span>
+              {providerOpen ? '☁ Cloud provider pricing' : `☁ ${activeProvider?.label || 'Cloud pricing'}`}
+              {!providerOpen && activeGpuRate !== null && (
+                <span className={styles.chipG} style={{ marginLeft: 8 }}>
+                  {activeGpu} @ ${activeGpuRate.toFixed(2)}/hr
+                </span>
+              )}
+            </span>
+            <span style={{ color: '#a0a0a0', fontSize: 11, fontFamily: 'JetBrains Mono' }}>{providerOpen ? '▲' : '▼'}</span>
+          </div>
+          {providerOpen && (
+            <div style={{ marginTop: 12 }}>
+              {providerLoading && <div style={{ fontSize: 12, color: '#8a8a8a', padding: '8px 0' }}>Loading providers...</div>}
+              {providerError && (
+                <div style={{ fontSize: 12, color: '#dc2626', padding: '8px 0', marginBottom: 8 }}>
+                  {providerError}
+                </div>
+              )}
+              {providers.length > 0 && (
+                <>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}></th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>Provider</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>GPU</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}>$/HR</th>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {providers.map(p => {
+                          const gpu = selectedGpus[p.id] || p.gpus[0]?.model || ''
+                          const rate = getEffectiveRate(p.id, gpu, providers, priceOverrides)
+                          const overrideKey = `${p.id}_${gpu}`
+                          const hasOverride = priceOverrides[overrideKey] !== undefined
+                          return (
+                            <tr key={p.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                              <td style={{ padding: '6px 8px' }}>
+                                <input
+                                  type="radio"
+                                  name="provider"
+                                  checked={activeProviderId === p.id}
+                                  onChange={() => setActiveProviderId(p.id)}
+                                  style={{ cursor: 'pointer' }}
+                                />
+                              </td>
+                              <td style={{ padding: '6px 8px', fontWeight: activeProviderId === p.id ? 600 : 400 }}>
+                                {p.label}
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                <select
+                                  value={gpu}
+                                  onChange={e => {
+                                    const newGpu = e.target.value
+                                    setSelectedGpus(prev => ({ ...prev, [p.id]: newGpu }))
+                                    saveSelectedGpu(p.id, newGpu)
+                                  }}
+                                  style={{
+                                    fontSize: 11,
+                                    padding: '4px 6px',
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: 3,
+                                    background: '#fafafa',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  {p.gpus.map(g => (
+                                    <option key={g.model} value={g.model}>
+                                      {g.model}
+                                    </option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={rate ?? ''}
+                                  placeholder="n/a"
+                                  onChange={e => {
+                                    const val = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                                    setPriceOverrides(prev => ({ ...prev, [overrideKey]: val }))
+                                    setUserOverride(p.id, gpu, val)
+                                  }}
+                                  style={{
+                                    width: 70,
+                                    fontSize: 11,
+                                    padding: '4px 6px',
+                                    border: hasOverride ? '1.5px solid #0066cc' : '1px solid #e0e0e0',
+                                    borderRadius: 3,
+                                    background: hasOverride ? '#f0f9ff' : '#fff',
+                                    fontFamily: 'JetBrains Mono',
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: '6px 8px' }}>
+                                {hasOverride && (
+                                  <button
+                                    onClick={() => {
+                                      setPriceOverrides(prev => {
+                                        const next = { ...prev }
+                                        delete next[overrideKey]
+                                        return next
+                                      })
+                                      clearUserOverride(p.id, gpu)
+                                    }}
+                                    style={{
+                                      fontSize: 10,
+                                      padding: '3px 7px',
+                                      border: 'none',
+                                      background: '#f0f0f0',
+                                      borderRadius: 3,
+                                      cursor: 'pointer',
+                                      color: '#555',
+                                    }}
+                                  >
+                                    reset
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <button
+                    className={styles.btnGhost}
+                    onClick={() => {
+                      showToast('Add provider feature coming soon')
+                    }}
+                    style={{ marginTop: 10 }}
+                  >
+                    + add provider
+                  </button>
+                  <div style={{ fontSize: 10, color: '#8a8a8a', marginTop: 8, fontFamily: 'JetBrains Mono' }}>
+                    Last updated: {new Date().toLocaleTimeString()}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Software & licenses */}
         <div className={styles.ps}>
           <div className={styles.pst} style={{ marginBottom: 8 }}>
@@ -822,6 +1047,11 @@ export default function ClusterCostPage() {
                   <select className={styles.licUnit} value={l.cycle} onChange={e => upLic(l.id, 'cycle', e.target.value)}>
                     <option value="yr">/yr</option>
                     <option value="mo">/mo</option>
+                  </select>
+                  <select className={styles.licUnit} value={l.scope} onChange={e => upLic(l.id, 'scope', e.target.value)}>
+                    <option value="both">Cloud + On-prem</option>
+                    <option value="cloud">Cloud only</option>
+                    <option value="onprem">On-prem only</option>
                   </select>
                   <button className={styles.licRm} onClick={() => rmLic(l.id)}>
                     ×
@@ -898,15 +1128,6 @@ export default function ClusterCostPage() {
               <span style={{ color: '#a0a0a0', fontSize: 11, fontFamily: 'JetBrains Mono' }}>{ratesOpen ? '▲' : '▼'}</span>
             </div>
             <div className={`${styles.ratesBody} ${ratesOpen ? styles.open : ''}`}>
-              <div className={styles.rateGroup}>☁ Cloud GPU on-demand rates ($/hr)</div>
-              {GPU_CATALOG.map(g => (
-                <div key={g.id} className={styles.rateRow}>
-                  <span className={styles.rateK}>{g.label}</span>
-                  <input className={styles.rateIn} type="number" defaultValue={g.rate} />
-                  <span className={styles.rateU}>$/hr</span>
-                  <span />
-                </div>
-              ))}
               <div className={styles.rateGroup}>☁ Cloud other rates</div>
               {CLOUD_RATES.map(([k, lbl, unit]) => (
                 <div key={k} className={styles.rateRow}>
@@ -934,7 +1155,7 @@ export default function ClusterCostPage() {
                   <span />
                 </div>
               ))}
-              <div className={styles.rateGroup}>🖥 On-prem other rates</div>
+              <div className={styles.rateGroup}>🖥 On-prem other costs</div>
               {ONPREM_RATES.map(([k, lbl, unit]) => (
                 <div key={k} className={styles.rateRow}>
                   <span className={styles.rateK}>{lbl}</span>
@@ -1057,9 +1278,14 @@ export default function ClusterCostPage() {
                   <br />
                   {side.mult.toFixed(1)}× {cls === 'cloud' ? 'headline' : 'hardware'} price
                 </div>
-                {licMonthly > 0 && (
+                {cls === 'cloud' && licCloud > 0 && (
                   <div className={styles.cmpLic}>
-                    ⬡ +${Math.round(licMonthly).toLocaleString()}/mo software
+                    ⬡ +${Math.round(licCloud).toLocaleString()}/mo software
+                  </div>
+                )}
+                {cls === 'onprem' && licOnPrem > 0 && (
+                  <div className={styles.cmpLic}>
+                    ⬡ +${Math.round(licOnPrem).toLocaleString()}/mo software
                   </div>
                 )}
               </div>
@@ -1114,7 +1340,7 @@ export default function ClusterCostPage() {
               <tbody>
                 {clusters.map(cl => {
                   const gpus = cl.nodeGroups.reduce((s, ng) => s + ng.count, 0)
-                  const cCloud = calcCloud([cl], 0, false, rates).total
+                  const cCloud = calcCloud([cl], 0, false, rates, activeGpuRate || 0).total
                   const cOp = calcOnPrem([cl], 0, false, rates).total
                   return (
                     <tr key={cl.id}>
