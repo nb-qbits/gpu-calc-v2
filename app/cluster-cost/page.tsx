@@ -488,12 +488,17 @@ export default function ClusterCostPage() {
 
   const loadProviders = async () => {
     setProviderLoading(true)
+    setProviderError(null)
     try {
       const data = await fetchAllProviders()
       setProviders(data)
       setSelectedGpus(loadSelectedGpus(data))
       setPriceOverrides(loadUserOverrides())
-      setProviderError(data.length === 0 ? 'Could not reach pricing worker' : null)
+      // Check if we're using fallback (first provider is 'gcp' with exactly those GPUs)
+      const isFallback = data.length > 0 && data[0]?.id === 'gcp' && data[0]?.gpus?.length === 4
+      if (isFallback) {
+        setProviderError('Could not reach pricing worker — using cached prices')
+      }
     } catch (error) {
       setProviderError('Failed to load provider data')
     } finally {
@@ -878,8 +883,37 @@ export default function ClusterCostPage() {
             <div style={{ marginTop: 12 }}>
               {providerLoading && <div style={{ fontSize: 12, color: '#8a8a8a', padding: '8px 0' }}>Loading providers...</div>}
               {providerError && (
-                <div style={{ fontSize: 12, color: '#dc2626', padding: '8px 0', marginBottom: 8 }}>
-                  {providerError}
+                <div style={{
+                  fontSize: 11.5,
+                  color: '#92400e',
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: 4,
+                  padding: '8px 10px',
+                  marginBottom: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8
+                }}>
+                  <span style={{ flex: 1 }}>{providerError}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      loadProviders()
+                    }}
+                    style={{
+                      fontSize: 11,
+                      color: '#0066cc',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '2px 6px',
+                      fontFamily: 'JetBrains Mono',
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    ↻ Retry
+                  </button>
                 </div>
               )}
               {providers.length > 0 && (

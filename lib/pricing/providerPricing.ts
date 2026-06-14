@@ -23,9 +23,90 @@ let cache: CacheEntry | null = null
 const WORKER_URL = process.env.NEXT_PUBLIC_PRICING_WORKER_URL ||
   'https://gpu-pricing-worker.vikasgrover2004.workers.dev/'
 
+// Fallback providers when worker is unreachable
+const FALLBACK_PROVIDERS: Provider[] = [
+  {
+    id: 'gcp',
+    label: 'GCP',
+    gpus: [
+      { model: 'H100 SXM', price: 3.20 },
+      { model: 'H200 SXM', price: null },
+      { model: 'A100 80GB', price: 2.40 },
+      { model: 'L40S', price: 1.85 },
+    ],
+  },
+  {
+    id: 'aws',
+    label: 'AWS',
+    gpus: [
+      { model: 'H100 SXM', price: 3.89 },
+      { model: 'H200 SXM', price: 4.50 },
+      { model: 'A100 80GB', price: 3.20 },
+      { model: 'A100 40GB', price: 2.40 },
+    ],
+  },
+  {
+    id: 'lambda',
+    label: 'Lambda',
+    gpus: [
+      { model: 'H100 SXM', price: 2.99 },
+      { model: 'A100 80GB', price: 1.99 },
+      { model: 'A10', price: 0.75 },
+    ],
+  },
+  {
+    id: 'coreweave',
+    label: 'CoreWeave',
+    gpus: [
+      { model: 'H100 SXM', price: 2.45 },
+      { model: 'H200 SXM', price: null },
+      { model: 'A100 80GB', price: 1.92 },
+      { model: 'L40S', price: 1.19 },
+    ],
+  },
+  {
+    id: 'runpod',
+    label: 'RunPod',
+    gpus: [
+      { model: 'H100 SXM', price: 2.59 },
+      { model: 'A100 80GB', price: 1.64 },
+      { model: 'L40S', price: 0.99 },
+      { model: 'A40', price: 0.49 },
+    ],
+  },
+  {
+    id: 'azure',
+    label: 'Azure',
+    gpus: [
+      { model: 'H100 SXM', price: 3.67 },
+      { model: 'A100 80GB', price: 2.88 },
+      { model: 'H200 SXM', price: null },
+    ],
+  },
+  {
+    id: 'vastai',
+    label: 'Vast.ai',
+    gpus: [
+      { model: 'H100 SXM', price: 0.87 },
+      { model: 'A100 80GB', price: 0.52 },
+      { model: 'A100 40GB', price: 0.24 },
+      { model: 'L40S', price: 0.39 },
+    ],
+  },
+  {
+    id: 'nebius',
+    label: 'Nebius',
+    gpus: [
+      { model: 'H100 SXM', price: 2.18 },
+      { model: 'H200 SXM', price: 3.20 },
+      { model: 'A100 80GB', price: 1.55 },
+    ],
+  },
+]
+
 /**
  * Fetch all providers from worker. Tries multiple endpoints until success.
- * Returns [] on error and logs the issue.
+ * Returns fallback providers on error.
  */
 export async function fetchAllProviders(): Promise<Provider[]> {
   // Check cache first
@@ -66,8 +147,8 @@ export async function fetchAllProviders(): Promise<Provider[]> {
     }
   }
 
-  console.error('[Pricing] All endpoints failed, returning empty array')
-  return []
+  console.warn('[Pricing] All endpoints failed, using fallback providers')
+  return FALLBACK_PROVIDERS
 }
 
 /**
