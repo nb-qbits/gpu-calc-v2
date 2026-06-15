@@ -1082,7 +1082,7 @@ export default function ClusterCostPage() {
                     <option value="yr">/yr</option>
                     <option value="mo">/mo</option>
                   </select>
-                  <select className={styles.licUnit} value={l.scope} onChange={e => upLic(l.id, 'scope', e.target.value)}>
+                  <select className={styles.licScope} value={l.scope} onChange={e => upLic(l.id, 'scope', e.target.value)}>
                     <option value="both">Cloud + On-prem</option>
                     <option value="cloud">Cloud only</option>
                     <option value="onprem">On-prem only</option>
@@ -1243,7 +1243,7 @@ export default function ClusterCostPage() {
           {(viewMode === 'cloud' || viewMode === 'both') && (
             <div className={styles.stackCol}>
               <div className={`${styles.stackHdr} ${styles.cloud}`}>
-                ☁ <span>Cloud (AWS)</span>
+                ☁ <span>Cloud ({activeProvider?.label || 'Cloud'})</span>
                 <span style={{ marginLeft: 'auto', fontFamily: 'JetBrains Mono', fontSize: 11, opacity: 0.7 }}>
                   ${Math.round(cloud.total / 1000)}K/mo
                 </span>
