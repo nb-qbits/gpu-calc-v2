@@ -2,7 +2,7 @@
 // Update both files if efficiency_constants.yaml changes.
 import type { RooflineGpu, RooflineModel, Dtype, GpuArch } from './roofline-types'
 
-const MFU_BASE: Record<GpuArch, Partial<Record<Dtype, number>>> = {
+const MFU_BASE: Partial<Record<GpuArch, Partial<Record<Dtype, number>>>> = {
   hopper:    { bf16: 0.55, fp16: 0.55, fp8: 0.53, mxfp4: 0.50 },
   ampere:    { bf16: 0.50, fp16: 0.50, fp8: 0.405, mxfp4: 0.45 },
   ada:       { bf16: 0.42, fp16: 0.42, fp8: 0.45, mxfp4: 0.45 },

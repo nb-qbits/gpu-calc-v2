@@ -1,6 +1,6 @@
 export type Dtype = 'fp16' | 'bf16' | 'fp8' | 'mxfp4' | 'int8' | 'int4' | 'fp32'
 export type TrafficClass = 'realtime' | 'mixed' | 'batch'
-export type GpuArch = 'hopper' | 'ampere' | 'ada' | 'blackwell'
+export type GpuArch = 'hopper' | 'ampere' | 'ada' | 'blackwell' | 'cdna2' | 'cdna3' | 'cdna4'
 export type MemoryType = 'hbm' | 'gddr'
 export type BindingConstraint = 'prefill-bound' | 'decode-bound' | 'kv-memory-bound'
 export type ConfidenceLevel = 'high' | 'medium' | 'default'

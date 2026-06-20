@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Grid, GridItem,
   Card, CardHeader, CardBody, CardTitle,
@@ -11,6 +11,7 @@ import {
   Alert,
   Title, Text, TextContent, TextVariants,
   Divider,
+  Button,
   PageSection,
 } from '@patternfly/react-core';
 import { ROOFLINE_GPU_CATALOG, getRooflineGpuById } from '@/lib/gpu-math/roofline-gpu-catalog';
@@ -102,9 +103,14 @@ function ReplicaBar({ low, recommended, high }: { low: number; recommended: numb
 
 export default function RooflineEstimate() {
   const [inputs, setInputs] = useState<WorkloadInputs>(DEFAULT_INPUTS);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   function set<K extends keyof WorkloadInputs>(key: K, value: WorkloadInputs[K]) {
     setInputs(prev => ({ ...prev, [key]: value }));
+  }
+
+  function scrollToResults() {
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   const result = useMemo(() => {
@@ -263,6 +269,15 @@ export default function RooflineEstimate() {
                       ))}
                     </FormSelect>
                   </FormGroup>
+
+                  <div style={{ paddingTop: 8 }}>
+                    <Button variant="primary" isBlock onClick={scrollToResults}>
+                      Run estimate
+                    </Button>
+                    <p style={{ fontSize: 11.5, color: '#6a6e73', marginTop: 6, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+                      Results update automatically
+                    </p>
+                  </div>
                 </Form>
               </CardBody>
             </Card>
@@ -270,6 +285,7 @@ export default function RooflineEstimate() {
 
           {/* ── Right panel: results ───────────────────────────── */}
           <GridItem span={8}>
+          <div ref={resultsRef}>
             {!result && (
               <Card>
                 <CardBody>
@@ -515,6 +531,7 @@ export default function RooflineEstimate() {
                 </Grid>
               );
             })()}
+          </div>
           </GridItem>
         </Grid>
       </div>
