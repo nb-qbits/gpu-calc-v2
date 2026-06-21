@@ -16,7 +16,7 @@ import {
 } from '@patternfly/react-core';
 import { ROOFLINE_GPU_CATALOG, getRooflineGpuById } from '@/lib/gpu-math/roofline-gpu-catalog';
 import { ROOFLINE_MODEL_CATALOG, getRooflineModelById } from '@/lib/gpu-math/roofline-model-catalog';
-import { runRooflinePlan } from '@/lib/gpu-math/roofline-engine';
+import { runRooflinePlan, CONFIDENCE_BAND } from '@/lib/gpu-math/roofline-engine';
 import type { WorkloadInputs, Dtype, TrafficClass } from '@/lib/gpu-math/roofline-types';
 
 const DEFAULT_INPUTS: WorkloadInputs = {
@@ -350,8 +350,13 @@ export default function RooflineEstimate() {
                           onChange={(_e, v) => setPrefixCacheRateRaw(v)}
                         />
                         <FormHelperText style={{ fontSize: 11.5, color: '#54585c' }}>
-                          Fraction of requests that hit the cache (0&ndash;1).
+                          Fraction of requests that hit the cache (0–1).
                         </FormHelperText>
+                        {prefixCacheRateRaw.trim() && !prefixCacheLenRaw.trim() && (
+                          <FormHelperText style={{ fontSize: 11.5, color: '#c9190b' }}>
+                            Set prefix length to enable caching.
+                          </FormHelperText>
+                        )}
                       </FormGroup>
                     </GridItem>
                   </Grid>
@@ -360,7 +365,7 @@ export default function RooflineEstimate() {
                     <Button variant="primary" isBlock onClick={scrollToResults}>
                       Run estimate
                     </Button>
-                    <p style={{ fontSize: 11.5, color: '#6a6e73', marginTop: 6, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+                    <p style={{ fontSize: 11.5, color: '#3c3f42', marginTop: 6, textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
                       Results update automatically
                     </p>
                   </div>
@@ -375,7 +380,7 @@ export default function RooflineEstimate() {
             {!result && (
               <Card>
                 <CardBody>
-                  <Text style={{ color: '#6a6e73' }}>Configure a scenario to see the estimate.</Text>
+                  <Text style={{ color: '#3c3f42' }}>Configure a scenario to see the estimate.</Text>
                 </CardBody>
               </Card>
             )}
@@ -414,7 +419,7 @@ export default function RooflineEstimate() {
                               </Label>
                             </div>
                             <div style={subNote}>
-                              ±{est.confidence === 'high' ? '10' : est.confidence === 'medium' ? '20' : '25'}%
+                              ±{Math.round((CONFIDENCE_BAND[est.confidence] ?? 0.25) * 100)}%
                             </div>
                           </GridItem>
                         </Grid>

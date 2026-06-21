@@ -11,7 +11,7 @@ const DTYPE_BYTES: Record<string, number> = {
   fp32: 4.0, bf16: 2.0, fp16: 2.0, fp8: 1.0, mxfp4: 0.5, int8: 1.0, int4: 0.5,
 }
 const HEADROOM: Record<string, number> = { realtime: 1.40, mixed: 1.25, batch: 1.10 }
-const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = { high: 0.10, medium: 0.20, default: 0.25 }
+export const CONFIDENCE_BAND: Record<ConfidenceLevel, number> = { high: 0.10, medium: 0.20, default: 0.25 }
 const FIXED_OVERHEAD_BYTES = 0.5e9
 const MAX_QUEUE_UTIL = 0.94
 const LOW_KV_THRESHOLD = 4
@@ -19,6 +19,9 @@ const CHUNKED_PREFILL_ISL_THRESHOLD = 4096
 const BATCH_EFFICIENCY = 0.70
 // Engine throughput multiplier vs vLLM baseline.
 // Derived from llm-inference-planner/planner/efficiency_constants.yaml engine_factor.
+// Python capacity.py plan() does not apply this factor at call time — it is an offline
+// calibration constant there. TypeScript applies it as a live ceiling multiplier, which
+// is the physically correct behaviour (TRT-LLM genuinely achieves ~29% higher throughput).
 const ENGINE_FACTOR: Record<string, number> = { vllm: 1.0, trtllm: 1.2936 }
 
 function normalizeTraffic(rpd: number, peakMult: number, isl: number, osl: number): Traffic {
@@ -85,7 +88,7 @@ function computeKvBudget(
     kv_bytes_per_token: model.kv_bytes_per_token,
     weights_resident_bytes: weightsBytes,
     usable_mem_bytes: usableMem,
-    kv_cache_budget_bytes: kvCacheBudget,
+    kv_cache_budget_bytes: usableMem - weightsBytes - FIXED_OVERHEAD_BYTES,
     max_kv_tokens: maxKvTokens,
     max_concurrent_seqs: maxConcurrentSeqs,
     effective_context_tokens,
@@ -198,6 +201,9 @@ export function runRooflinePlan(
   if (!(dtype in DTYPE_BYTES)) {
     return { ok: false, error: { type: 'unknown_dtype', message: `Unknown dtype: ${dtype}` } }
   }
+  if (gpu.peak_flops[dtype as Dtype] == null) {
+    return { ok: false, error: { type: 'unknown_dtype', message: `${gpu.display_name} does not support ${dtype}. Choose a supported precision for this GPU.` } }
+  }
 
   // ── Prefix cache: reduce effective ISL for prefill compute only ──────────
   // Cached tokens skip recomputation but remain in KV memory — KV budget uses full ISL.
@@ -248,7 +254,7 @@ export function runRooflinePlan(
   const decodeTpsRaw = computeDecodeCeiling(gpu, model, dtype, effBatch, avgCtx, decodeBwEff, tp, mfu)
   const decodeTps    = decodeTpsRaw * engineFactor
 
-  const sz = sizeReplicas(traffic, pfillTps, decodeTps, effectiveMaxSeqs, traffic_class, isl, osl, effBatch)
+  const sz = sizeReplicas(traffic, pfillTps, decodeTps, effectiveMaxSeqs, traffic_class, effectiveIsl, osl, effBatch)
 
   const replicasLow  = Math.max(1, Math.ceil(sz.replicas * (1 - bandFactor)))
   const replicasHigh = Math.ceil(sz.replicas * (1 + bandFactor))
@@ -274,7 +280,7 @@ export function runRooflinePlan(
       `Sliding-window model: effective context per layer = ${kv.effective_context_tokens.toFixed(0)} tokens ` +
       `(${Math.floor(model.num_layers / model.global_layer_every_n)} global × ${isl + osl} + ` +
       `${model.num_layers - Math.floor(model.num_layers / model.global_layer_every_n)} local × min(${isl + osl}, ${model.sliding_window})). ` +
-      `KV budget holds ${kv.max_concurrent_seqs} seqs vs ${Math.floor((kv.kv_cache_budget_bytes / model.kv_bytes_per_token) / (isl + osl))} without sliding-window correction.`
+      `KV budget holds ${kv.max_concurrent_seqs} seqs vs ${Math.floor(kv.max_kv_tokens / (isl + osl))} without sliding-window correction.`
     )
   if (prefixCachedTokens > 0)
     warnings.push(
