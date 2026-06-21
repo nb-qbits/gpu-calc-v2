@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import {
   Grid, GridItem,
   Card, CardHeader, CardBody, CardTitle,
-  Form, FormGroup, FormSelect, FormSelectOption,
+  Form, FormGroup, FormHelperText, FormSelect, FormSelectOption,
   TextInput,
   Label,
   DescriptionList, DescriptionListGroup, DescriptionListTerm, DescriptionListDescription,
@@ -31,11 +31,17 @@ const DEFAULT_INPUTS: WorkloadInputs = {
   ttft_slo_ms: 500,
   traffic_class: 'realtime',
   gpu_mem_util: 0.90,
+  runtime: 'vllm',
+  // max_num_seqs, prefix_cache_len, prefix_cache_hit_rate intentionally undefined (no cap / no cache)
 };
 
 const DTYPE_OPTIONS: Dtype[] = ['bf16', 'fp16', 'fp8', 'mxfp4'];
 const TRAFFIC_CLASS_OPTIONS: TrafficClass[] = ['realtime', 'mixed', 'batch'];
 const TP_OPTIONS = [1, 2, 4, 8];
+const RUNTIME_OPTIONS: Array<{ value: 'vllm' | 'trtllm'; label: string }> = [
+  { value: 'vllm',   label: 'vLLM' },
+  { value: 'trtllm', label: 'TRT-LLM (+29%)' },
+];
 
 function fmtTps(n: number): string {
   if (n >= 1e12) return `${(n / 1e12).toFixed(2)} T tok/s`
@@ -103,6 +109,9 @@ function ReplicaBar({ low, recommended, high }: { low: number; recommended: numb
 
 export default function RooflineEstimate() {
   const [inputs, setInputs] = useState<WorkloadInputs>(DEFAULT_INPUTS);
+  const [maxNumSeqsRaw, setMaxNumSeqsRaw] = useState<string>('');
+  const [prefixCacheLenRaw, setPrefixCacheLenRaw] = useState<string>('');
+  const [prefixCacheRateRaw, setPrefixCacheRateRaw] = useState<string>('');
   const resultsRef = useRef<HTMLDivElement>(null);
 
   function set<K extends keyof WorkloadInputs>(key: K, value: WorkloadInputs[K]) {
@@ -117,8 +126,17 @@ export default function RooflineEstimate() {
     const model = getRooflineModelById(inputs.model_id);
     const gpu   = getRooflineGpuById(inputs.gpu_id);
     if (!model || !gpu) return null;
-    return runRooflinePlan(inputs, model, gpu);
-  }, [inputs]);
+
+    const maxNumSeqs      = maxNumSeqsRaw.trim()     ? Math.max(1, parseInt(maxNumSeqsRaw, 10))                        : undefined;
+    const prefixCacheLen  = prefixCacheLenRaw.trim()  ? Math.max(0, parseInt(prefixCacheLenRaw, 10))                    : undefined;
+    const prefixCacheRate = prefixCacheRateRaw.trim() ? Math.min(1, Math.max(0, parseFloat(prefixCacheRateRaw)))        : undefined;
+
+    return runRooflinePlan(
+      { ...inputs, max_num_seqs: maxNumSeqs, prefix_cache_len: prefixCacheLen, prefix_cache_hit_rate: prefixCacheRate },
+      model,
+      gpu,
+    );
+  }, [inputs, maxNumSeqsRaw, prefixCacheLenRaw, prefixCacheRateRaw]);
 
   return (
     <PageSection
@@ -270,6 +288,74 @@ export default function RooflineEstimate() {
                     </FormSelect>
                   </FormGroup>
 
+                  <FormGroup label="Runtime" fieldId="rl-runtime">
+                    <FormSelect
+                      id="rl-runtime"
+                      value={inputs.runtime ?? 'vllm'}
+                      onChange={(_e, v) => set('runtime', v as 'vllm' | 'trtllm')}
+                      aria-label="Runtime"
+                    >
+                      {RUNTIME_OPTIONS.map(r => (
+                        <FormSelectOption key={r.value} value={r.value} label={r.label} />
+                      ))}
+                    </FormSelect>
+                  </FormGroup>
+
+                  <Divider style={{ margin: '4px 0' }} />
+
+                  <FormGroup
+                    label="Max concurrent seqs"
+                    fieldId="rl-maxseqs"
+                  >
+                    <TextInput
+                      id="rl-maxseqs"
+                      type="number"
+                      value={maxNumSeqsRaw}
+                      placeholder="no cap"
+                      onChange={(_e, v) => setMaxNumSeqsRaw(v)}
+                    />
+                    <FormHelperText style={{ fontSize: 11.5, color: '#54585c' }}>
+                      Blank = limited only by KV budget. Set to match --max-num-seqs.
+                    </FormHelperText>
+                  </FormGroup>
+
+                  <Grid hasGutter>
+                    <GridItem span={6}>
+                      <FormGroup
+                        label="Prefix cache length (tokens)"
+                        fieldId="rl-plen"
+                      >
+                        <TextInput
+                          id="rl-plen"
+                          type="number"
+                          value={prefixCacheLenRaw}
+                          placeholder="0"
+                          onChange={(_e, v) => setPrefixCacheLenRaw(v)}
+                        />
+                        <FormHelperText style={{ fontSize: 11.5, color: '#54585c' }}>
+                          Shared prefix / system prompt length.
+                        </FormHelperText>
+                      </FormGroup>
+                    </GridItem>
+                    <GridItem span={6}>
+                      <FormGroup
+                        label="Prefix hit rate"
+                        fieldId="rl-phit"
+                      >
+                        <TextInput
+                          id="rl-phit"
+                          type="number"
+                          value={prefixCacheRateRaw}
+                          placeholder="0.0"
+                          onChange={(_e, v) => setPrefixCacheRateRaw(v)}
+                        />
+                        <FormHelperText style={{ fontSize: 11.5, color: '#54585c' }}>
+                          Fraction of requests that hit the cache (0&ndash;1).
+                        </FormHelperText>
+                      </FormGroup>
+                    </GridItem>
+                  </Grid>
+
                   <div style={{ paddingTop: 8 }}>
                     <Button variant="primary" isBlock onClick={scrollToResults}>
                       Run estimate
@@ -413,6 +499,14 @@ export default function RooflineEstimate() {
                               {est.kv_budget.max_concurrent_seqs}
                             </DescriptionListDescription>
                           </DescriptionListGroup>
+                          {est.kv_budget.effective_context_tokens !== (inputs.isl + inputs.osl) && (
+                            <DescriptionListGroup>
+                              <DescriptionListTerm>Effective context (sliding window)</DescriptionListTerm>
+                              <DescriptionListDescription style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                {est.kv_budget.effective_context_tokens.toFixed(0)} tokens/layer
+                              </DescriptionListDescription>
+                            </DescriptionListGroup>
+                          )}
                           <DescriptionListGroup>
                             <DescriptionListTerm>MFU (prefill)</DescriptionListTerm>
                             <DescriptionListDescription style={{ fontVariantNumeric: 'tabular-nums' }}>
