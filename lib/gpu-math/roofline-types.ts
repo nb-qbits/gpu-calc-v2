@@ -35,6 +35,8 @@ export interface RooflineModel {
   resident_weights_gb?: number
   num_experts?: number
   experts_per_token?: number
+  sliding_window?: number        // local-layer KV window size in tokens (e.g. 4096 for Gemma 2)
+  global_layer_every_n?: number  // 1-in-N layers is global full-context (e.g. 2 for Gemma 2 9B)
 }
 
 export interface WorkloadInputs {
@@ -49,6 +51,10 @@ export interface WorkloadInputs {
   ttft_slo_ms: number
   traffic_class: TrafficClass
   gpu_mem_util: number
+  max_num_seqs?: number        // vLLM --max-num-seqs cap; undefined = no cap beyond KV budget
+  prefix_cache_len?: number    // shared prefix length in tokens (e.g. system prompt)
+  prefix_cache_hit_rate?: number // fraction of requests hitting prefix cache (0.0–1.0)
+  runtime?: 'vllm' | 'trtllm'  // inference runtime; affects ceiling throughput
 }
 
 export interface Traffic {
@@ -69,6 +75,7 @@ export interface KvBudget {
   kv_cache_budget_bytes: number
   max_kv_tokens: number
   max_concurrent_seqs: number
+  effective_context_tokens: number  // weighted avg tokens per layer per sequence; < isl+osl for sliding-window models
 }
 
 export interface TtftEstimate {
@@ -105,6 +112,7 @@ export interface CapacityEstimate {
   eff_batch_used: number
   kv_ratio: number
   headroom_factor: number
+  runtime_used: 'vllm' | 'trtllm'  // runtime that was applied
 }
 
 export interface CostEstimate {
