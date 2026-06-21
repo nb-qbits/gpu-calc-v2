@@ -23,8 +23,7 @@ import { fetchModelConfig, type HFModelConfig } from '@/lib/huggingface/fetch-co
 import type { WorkloadInputs, Dtype, TrafficClass } from '@/lib/gpu-math/roofline-types';
 
 const MODEL_OPTIONS = ROOFLINE_MODEL_CATALOG
-  .filter(m => m.hfId)
-  .map(m => m.hfId as string)
+  .map(m => ({ value: m.hfId ?? m.id, label: m.display_name }))
 
 const DEFAULT_MODEL_HF_ID = 'meta-llama/Llama-3.1-8B-Instruct'
 
@@ -225,7 +224,7 @@ export default function RooflineEstimate() {
                         style={{ flex: 1 }}
                       />
                       <datalist id="rl-model-list">
-                        {MODEL_OPTIONS.map(hfId => <option key={hfId} value={hfId} />)}
+                        {MODEL_OPTIONS.map(o => <option key={o.value} value={o.value} label={o.label} />)}
                       </datalist>
                       {isFetchingConfig ? (
                         <Label color="blue" style={{ whiteSpace: 'nowrap' }}>Fetching…</Label>
