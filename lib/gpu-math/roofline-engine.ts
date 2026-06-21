@@ -17,6 +17,9 @@ const MAX_QUEUE_UTIL = 0.94
 const LOW_KV_THRESHOLD = 4
 const CHUNKED_PREFILL_ISL_THRESHOLD = 4096
 const BATCH_EFFICIENCY = 0.70
+// Engine throughput multiplier vs vLLM baseline.
+// Derived from llm-inference-planner/planner/efficiency_constants.yaml engine_factor.
+const ENGINE_FACTOR: Record<string, number> = { vllm: 1.0, trtllm: 1.2936 }
 
 function normalizeTraffic(rpd: number, peakMult: number, isl: number, osl: number): Traffic {
   const avg_rps = rpd / 86_400
@@ -60,7 +63,23 @@ function computeKvBudget(
   }
 
   const maxKvTokens = kvCacheBudget / model.kv_bytes_per_token
-  const maxConcurrentSeqs = Math.max(1, Math.floor(maxKvTokens / (isl + osl)))
+
+  // Sliding-window models (Gemma 2/3/4): local layers cap KV at the window size;
+  // global layers store the full sequence. effective_context_tokens is the
+  // per-layer-average tokens stored per in-flight sequence.
+  let effective_context_tokens: number
+  if (model.sliding_window != null && model.global_layer_every_n != null) {
+    const globalLayers = Math.floor(model.num_layers / model.global_layer_every_n)
+    const localLayers  = model.num_layers - globalLayers
+    effective_context_tokens = (
+      globalLayers * (isl + osl) +
+      localLayers  * Math.min(isl + osl, model.sliding_window)
+    ) / model.num_layers
+  } else {
+    effective_context_tokens = isl + osl
+  }
+
+  const maxConcurrentSeqs = Math.max(1, Math.floor(maxKvTokens / effective_context_tokens))
 
   return {
     kv_bytes_per_token: model.kv_bytes_per_token,
@@ -69,6 +88,7 @@ function computeKvBudget(
     kv_cache_budget_bytes: kvCacheBudget,
     max_kv_tokens: maxKvTokens,
     max_concurrent_seqs: maxConcurrentSeqs,
+    effective_context_tokens,
   }
 }
 
@@ -166,56 +186,104 @@ function sizeReplicas(
 export function runRooflinePlan(
   inputs: WorkloadInputs, model: RooflineModel, gpu: RooflineGpu,
 ): RooflineResult {
-  const { dtype, tp, requests_per_day, peak_multiplier, isl, osl, ttft_slo_ms, traffic_class, gpu_mem_util } = inputs
+  const {
+    dtype, tp, requests_per_day, peak_multiplier,
+    isl, osl, ttft_slo_ms, traffic_class, gpu_mem_util,
+    max_num_seqs,
+    prefix_cache_len   = 0,
+    prefix_cache_hit_rate = 0.0,
+    runtime = 'vllm',
+  } = inputs
 
   if (!(dtype in DTYPE_BYTES)) {
     return { ok: false, error: { type: 'unknown_dtype', message: `Unknown dtype: ${dtype}` } }
   }
 
-  const traffic = normalizeTraffic(requests_per_day, peak_multiplier, isl, osl)
+  // ── Prefix cache: reduce effective ISL for prefill compute only ──────────
+  // Cached tokens skip recomputation but remain in KV memory — KV budget uses full ISL.
+  const prefixCachedTokens = prefix_cache_len > 0 && prefix_cache_hit_rate > 0
+    ? Math.floor(Math.min(prefix_cache_len, isl) * prefix_cache_hit_rate)
+    : 0
+  const effectiveIsl = Math.max(1, isl - prefixCachedTokens)
 
+  // ── Engine factor ─────────────────────────────────────────────────────────
+  const engineFactor = ENGINE_FACTOR[runtime] ?? 1.0
+
+  // ── Traffic (uses effectiveIsl — cached tokens don't drive prefill compute) ──
+  const traffic = normalizeTraffic(requests_per_day, peak_multiplier, effectiveIsl, osl)
+
+  // ── KV budget (always uses full isl — prefix KV must stay resident) ──────
   const kvResult = computeKvBudget(gpu, model, dtype, isl, osl, gpu_mem_util, tp)
   if ('error' in kvResult) {
     return { ok: false, error: { type: 'insufficient_vram', message: kvResult.error } }
   }
   const kv = kvResult as KvBudget
 
+  // ── max_num_seqs cap ──────────────────────────────────────────────────────
+  // vLLM --max-num-seqs limits the scheduler batch independently of VRAM capacity.
+  const effectiveMaxSeqs = max_num_seqs != null
+    ? Math.min(kv.max_concurrent_seqs, max_num_seqs)
+    : kv.max_concurrent_seqs
+
   const confidence: ConfidenceLevel = model.geometry_source === 'estimated' ? 'default' : 'medium'
   const bandFactor = CONFIDENCE_BAND[confidence]
 
-  const mfu       = mfuPrefill(model, gpu, dtype as Dtype, isl)
+  const mfu       = mfuPrefill(model, gpu, dtype as Dtype, effectiveIsl)
   const bwEffBase = bwEffPrefill(gpu)
-  const pfillTps  = computePrefillCeiling(gpu, model, dtype, isl, mfu, bwEffBase, tp)
+
+  // ── Prefill ceiling — apply engine factor ─────────────────────────────────
+  const pfillTpsRaw = computePrefillCeiling(gpu, model, dtype, effectiveIsl, mfu, bwEffBase, tp)
+  const pfillTps    = pfillTpsRaw * engineFactor
 
   const avgCtx   = isl + Math.floor(osl / 2)
-  const effBatch = Math.max(1, Math.floor(kv.max_concurrent_seqs * BATCH_EFFICIENCY))
+  const effBatch = Math.max(1, Math.floor(effectiveMaxSeqs * BATCH_EFFICIENCY))
 
   const dtypeBytes        = DTYPE_BYTES[dtype] ?? 2.0
   const weightBytesActive = model.active_params * dtypeBytes
   const kvBytesInflight   = kv.kv_bytes_per_token * avgCtx * effBatch
   const kvRatio           = kvBytesInflight / Math.max(weightBytesActive, 1)
   const decodeBwEff       = bwEffDecode(gpu, effBatch)
-  const decodeTps         = computeDecodeCeiling(gpu, model, dtype, effBatch, avgCtx, decodeBwEff, tp, mfu)
 
-  const sz = sizeReplicas(traffic, pfillTps, decodeTps, kv.max_concurrent_seqs, traffic_class, isl, osl, effBatch)
+  // ── Decode ceiling — apply engine factor ──────────────────────────────────
+  const decodeTpsRaw = computeDecodeCeiling(gpu, model, dtype, effBatch, avgCtx, decodeBwEff, tp, mfu)
+  const decodeTps    = decodeTpsRaw * engineFactor
+
+  const sz = sizeReplicas(traffic, pfillTps, decodeTps, effectiveMaxSeqs, traffic_class, isl, osl, effBatch)
 
   const replicasLow  = Math.max(1, Math.ceil(sz.replicas * (1 - bandFactor)))
   const replicasHigh = Math.ceil(sz.replicas * (1 + bandFactor))
 
   const rho  = traffic.input_tps_peak / (sz.replicas * pfillTps)
-  const ttft = estimateTtft(isl, pfillTps, rho, ttft_slo_ms)
+  const ttft = estimateTtft(effectiveIsl, pfillTps, rho, ttft_slo_ms)
 
   const warnings: string[] = []
   if (kv.max_concurrent_seqs < LOW_KV_THRESHOLD)
     warnings.push(`Very limited KV cache: only ${kv.max_concurrent_seqs} concurrent sequence(s) per replica. Consider higher tp or a GPU with more VRAM.`)
-  if (isl >= CHUNKED_PREFILL_ISL_THRESHOLD)
-    warnings.push(`ISL ${isl} ≥ ${CHUNKED_PREFILL_ISL_THRESHOLD}: chunked prefill required (--enable-chunked-prefill for vLLM).`)
+  if (max_num_seqs != null && max_num_seqs < kv.max_concurrent_seqs)
+    warnings.push(`max_num_seqs=${max_num_seqs} caps scheduler batch (KV budget allows ${kv.max_concurrent_seqs} seqs; scheduler cap is the binding limit).`)
+  if (effectiveIsl >= CHUNKED_PREFILL_ISL_THRESHOLD)
+    warnings.push(`ISL ${effectiveIsl} ≥ ${CHUNKED_PREFILL_ISL_THRESHOLD}: chunked prefill required (--enable-chunked-prefill for vLLM).`)
   if (model.geometry_source === 'estimated')
     warnings.push(`Model geometry estimated — verify layers, d_model, head config before production use.`)
   if (!ttft.slo_met && ttft.slo_breach_reason)
     warnings.push(`TTFT SLO breach: ${ttft.slo_breach_reason}`)
   if (confidence === 'default')
     warnings.push(`DEFAULT confidence (±25%): no anchor data. Validate on a live GPU before committing infrastructure.`)
+  if (model.sliding_window != null && model.global_layer_every_n != null)
+    warnings.push(
+      `Sliding-window model: effective context per layer = ${kv.effective_context_tokens.toFixed(0)} tokens ` +
+      `(${Math.floor(model.num_layers / model.global_layer_every_n)} global × ${isl + osl} + ` +
+      `${model.num_layers - Math.floor(model.num_layers / model.global_layer_every_n)} local × min(${isl + osl}, ${model.sliding_window})). ` +
+      `KV budget holds ${kv.max_concurrent_seqs} seqs vs ${Math.floor((kv.kv_cache_budget_bytes / model.kv_bytes_per_token) / (isl + osl))} without sliding-window correction.`
+    )
+  if (prefixCachedTokens > 0)
+    warnings.push(
+      `Prefix cache: ${prefix_cache_len} token prefix × ${(prefix_cache_hit_rate * 100).toFixed(0)}% hit rate ` +
+      `→ ${prefixCachedTokens} tokens skipped per request → effective prefill ISL ${effectiveIsl} ` +
+      `(KV budget still sized for full ISL ${isl}).`
+    )
+  if (runtime === 'trtllm')
+    warnings.push(`TRT-LLM engine factor ${engineFactor.toFixed(4)}× applied to prefill and decode ceilings.`)
   const pfR = sz.replicasPrefill, dcR = sz.replicasDecode
   if (pfR > 0 && dcR > 0 && Math.max(pfR, dcR) < Math.min(pfR, dcR) * 2)
     warnings.push(`Balanced prefill/decode load (${pfR} vs ${dcR} replicas). Both phases share the GPU — actual need may be higher.`)
@@ -224,10 +292,11 @@ export function runRooflinePlan(
     `GPU memory utilization: ${(gpu_mem_util * 100).toFixed(0)}%`,
     `MFU (prefill): ${mfu.toFixed(2)} (efficiency curve)`,
     `Bandwidth efficiency (decode): ${decodeBwEff.toFixed(2)}, KV ratio ${kvRatio.toFixed(1)}`,
-    `Batch efficiency: ${(BATCH_EFFICIENCY * 100).toFixed(0)}% of max seqs (${effBatch}/${kv.max_concurrent_seqs})`,
+    `Batch efficiency: ${(BATCH_EFFICIENCY * 100).toFixed(0)}% of max seqs (${effBatch}/${effectiveMaxSeqs})`,
     `Traffic headroom (${traffic_class}): ${sz.headroom.toFixed(2)}×`,
     `Tensor parallelism: tp=${tp} → ${sz.replicas} replicas × ${tp} = ${sz.replicas * tp} total GPUs`,
     `Avg context for decode: ${avgCtx} tokens (ISL + OSL/2)`,
+    `Runtime: ${runtime} (engine factor ${engineFactor.toFixed(4)}×)`,
     `TTFT queue model: M/M/1 heuristic — validate on live GPU.`,
   ]
 
@@ -255,6 +324,7 @@ export function runRooflinePlan(
     eff_batch_used: effBatch,
     kv_ratio: kvRatio,
     headroom_factor: sz.headroom,
+    runtime_used: runtime,
   }
 
   return { ok: true, estimate }

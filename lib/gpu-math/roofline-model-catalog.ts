@@ -129,6 +129,8 @@ export const ROOFLINE_MODEL_CATALOG: RooflineModel[] = [
     kv_dtype_bytes: 2,
     kv_bytes_per_token: kv(42, 8, 256, 2),
     geometry_source: 'known',
+    sliding_window: 4096,        // local layers cap KV at 4096 tokens
+    global_layer_every_n: 2,     // alternating: every 2nd layer is global (full-context)
   },
   {
     id: 'gpt-oss-20b',
