@@ -20,6 +20,7 @@ export interface RooflineGpu {
 
 export interface RooflineModel {
   id: string
+  hfId?: string        // HuggingFace model path (e.g. 'meta-llama/Llama-3.1-8B-Instruct')
   display_name: string
   is_moe: boolean
   total_params: number

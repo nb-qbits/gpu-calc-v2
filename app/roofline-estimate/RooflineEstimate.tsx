@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Grid, GridItem,
   Card, CardHeader, CardBody, CardTitle,
@@ -14,13 +14,22 @@ import {
   Button,
   PageSection,
 } from '@patternfly/react-core';
+import CheckCircleIcon from '@patternfly/react-icons/dist/esm/icons/check-circle-icon';
+import ExclamationTriangleIcon from '@patternfly/react-icons/dist/esm/icons/exclamation-triangle-icon';
 import { ROOFLINE_GPU_CATALOG, getRooflineGpuById } from '@/lib/gpu-math/roofline-gpu-catalog';
-import { ROOFLINE_MODEL_CATALOG, getRooflineModelById } from '@/lib/gpu-math/roofline-model-catalog';
+import { ROOFLINE_MODEL_CATALOG, getRooflineModelById, hfConfigToRooflineModel } from '@/lib/gpu-math/roofline-model-catalog';
 import { runRooflinePlan, CONFIDENCE_BAND } from '@/lib/gpu-math/roofline-engine';
+import { fetchModelConfig, type HFModelConfig } from '@/lib/huggingface/fetch-config';
 import type { WorkloadInputs, Dtype, TrafficClass } from '@/lib/gpu-math/roofline-types';
 
+const MODEL_OPTIONS = ROOFLINE_MODEL_CATALOG
+  .filter(m => m.hfId)
+  .map(m => m.hfId as string)
+
+const DEFAULT_MODEL_HF_ID = 'meta-llama/Llama-3.1-8B-Instruct'
+
 const DEFAULT_INPUTS: WorkloadInputs = {
-  model_id: 'llama-3.1-8b',
+  model_id: DEFAULT_MODEL_HF_ID,
   gpu_id: 'h100_sxm',
   dtype: 'bf16',
   tp: 1,
@@ -114,6 +123,45 @@ export default function RooflineEstimate() {
   const [prefixCacheRateRaw, setPrefixCacheRateRaw] = useState<string>('');
   const resultsRef = useRef<HTMLDivElement>(null);
 
+  // HF config fetch — used when model_id is not in the catalog
+  const [hfConfig, setHfConfig] = useState<HFModelConfig | null>(null);
+  const [isFetchingConfig, setIsFetchingConfig] = useState(false);
+  const [hfFetchError, setHfFetchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const modelId = inputs.model_id;
+    const inCatalog = ROOFLINE_MODEL_CATALOG.some(m => m.hfId === modelId || m.id === modelId);
+    if (inCatalog) {
+      setHfConfig(null);
+      setHfFetchError(null);
+      return;
+    }
+    if (!modelId.includes('/')) {
+      setHfConfig(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsFetchingConfig(true);
+      setHfFetchError(null);
+      const res = await fetchModelConfig(modelId);
+      setIsFetchingConfig(false);
+      if (res.success && res.config) {
+        setHfConfig(res.config);
+      } else {
+        setHfConfig(null);
+        setHfFetchError(res.error ?? 'Not found');
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [inputs.model_id]);
+
+  const rooflineModel = useMemo(() => {
+    const catalogMatch = getRooflineModelById(inputs.model_id);
+    if (catalogMatch) return catalogMatch;
+    if (hfConfig) return hfConfigToRooflineModel(inputs.model_id, hfConfig);
+    return null;
+  }, [inputs.model_id, hfConfig]);
+
   function set<K extends keyof WorkloadInputs>(key: K, value: WorkloadInputs[K]) {
     setInputs(prev => ({ ...prev, [key]: value }));
   }
@@ -123,20 +171,20 @@ export default function RooflineEstimate() {
   }
 
   const result = useMemo(() => {
-    const model = getRooflineModelById(inputs.model_id);
-    const gpu   = getRooflineGpuById(inputs.gpu_id);
-    if (!model || !gpu) return null;
+    if (!rooflineModel) return null;
+    const gpu = getRooflineGpuById(inputs.gpu_id);
+    if (!gpu) return null;
 
-    const maxNumSeqs      = maxNumSeqsRaw.trim()     ? Math.max(1, parseInt(maxNumSeqsRaw, 10))                        : undefined;
-    const prefixCacheLen  = prefixCacheLenRaw.trim()  ? Math.max(0, parseInt(prefixCacheLenRaw, 10))                    : undefined;
-    const prefixCacheRate = prefixCacheRateRaw.trim() ? Math.min(1, Math.max(0, parseFloat(prefixCacheRateRaw)))        : undefined;
+    const maxNumSeqs      = maxNumSeqsRaw.trim()     ? Math.max(1, parseInt(maxNumSeqsRaw, 10))                 : undefined;
+    const prefixCacheLen  = prefixCacheLenRaw.trim()  ? Math.max(0, parseInt(prefixCacheLenRaw, 10))             : undefined;
+    const prefixCacheRate = prefixCacheRateRaw.trim() ? Math.min(1, Math.max(0, parseFloat(prefixCacheRateRaw))) : undefined;
 
     return runRooflinePlan(
       { ...inputs, max_num_seqs: maxNumSeqs, prefix_cache_len: prefixCacheLen, prefix_cache_hit_rate: prefixCacheRate },
-      model,
+      rooflineModel,
       gpu,
     );
-  }, [inputs, maxNumSeqsRaw, prefixCacheLenRaw, prefixCacheRateRaw]);
+  }, [inputs, rooflineModel, maxNumSeqsRaw, prefixCacheLenRaw, prefixCacheRateRaw]);
 
   return (
     <PageSection
@@ -162,17 +210,36 @@ export default function RooflineEstimate() {
               </CardHeader>
               <CardBody>
                 <Form>
-                  <FormGroup label="Model" fieldId="rl-model">
-                    <FormSelect
-                      id="rl-model"
-                      value={inputs.model_id}
-                      onChange={(_e, v) => set('model_id', v)}
-                      aria-label="Model"
-                    >
-                      {ROOFLINE_MODEL_CATALOG.map(m => (
-                        <FormSelectOption key={m.id} value={m.id} label={m.display_name} />
-                      ))}
-                    </FormSelect>
+                  <FormGroup label="Model — Hugging Face ID" fieldId="rl-model">
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <TextInput
+                        id="rl-model"
+                        list="rl-model-list"
+                        value={inputs.model_id}
+                        onChange={(_e, v) => {
+                          set('model_id', v);
+                          setHfConfig(null);
+                          setHfFetchError(null);
+                        }}
+                        placeholder="Type or select a model..."
+                        style={{ flex: 1 }}
+                      />
+                      <datalist id="rl-model-list">
+                        {MODEL_OPTIONS.map(hfId => <option key={hfId} value={hfId} />)}
+                      </datalist>
+                      {isFetchingConfig ? (
+                        <Label color="blue" style={{ whiteSpace: 'nowrap' }}>Fetching…</Label>
+                      ) : getRooflineModelById(inputs.model_id) ? (
+                        <Label color="green" icon={<CheckCircleIcon />} style={{ whiteSpace: 'nowrap' }}>In catalog</Label>
+                      ) : hfConfig ? (
+                        <Label color="cyan" icon={<CheckCircleIcon />} style={{ whiteSpace: 'nowrap' }}>From HF</Label>
+                      ) : hfFetchError ? (
+                        <Label color="red" icon={<ExclamationTriangleIcon />} style={{ whiteSpace: 'nowrap' }}>Not found</Label>
+                      ) : null}
+                    </div>
+                    <FormHelperText style={{ fontSize: 11.5, color: '#54585c' }}>
+                      Popular: Llama 3.1, Qwen3, Mistral, Gemma 2 — type to autocomplete or enter any HF ID
+                    </FormHelperText>
                   </FormGroup>
 
                   <FormGroup label="GPU" fieldId="rl-gpu">
