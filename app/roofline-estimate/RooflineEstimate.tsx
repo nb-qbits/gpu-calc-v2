@@ -46,7 +46,7 @@ const DEFAULT_INPUTS: WorkloadInputs = {
 
 const DTYPE_OPTIONS: Dtype[] = ['bf16', 'fp16', 'fp8', 'mxfp4'];
 const TRAFFIC_CLASS_OPTIONS: TrafficClass[] = ['realtime', 'mixed', 'batch'];
-const TP_OPTIONS = [1, 2, 4, 8];
+const TP_OPTIONS = [1, 2, 4, 8, 16, 32, 64];
 const RUNTIME_OPTIONS: Array<{ value: 'vllm' | 'trtllm'; label: string }> = [
   { value: 'vllm',   label: 'vLLM' },
   { value: 'trtllm', label: 'TRT-LLM (+29%)' },
