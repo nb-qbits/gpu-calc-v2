@@ -24,6 +24,7 @@ import {
   RouteIcon,
   CogIcon,
   ListIcon,
+  ChartLineIcon,
 } from "@patternfly/react-icons";
 import { getVersionString, getBuildTimeString, getShortCommit } from "@/lib/version";
 
@@ -196,13 +197,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               isActive={pathname === "/routing"}
             />
 
-            <div style={groupLabelStyle}>SYSTEM</div>
+            <div style={groupLabelStyle}>PLAN</div>
 
             <NavItemWithIcon
-              icon={CogIcon}
-              label="Settings"
-              href="#"
-              isActive={false}
+              icon={ChartLineIcon}
+              label="Roofline estimate"
+              href="/roofline-estimate"
+              isActive={pathname === "/roofline-estimate"}
             />
           </NavList>
         </Nav>
