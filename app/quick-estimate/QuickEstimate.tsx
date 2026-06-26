@@ -395,6 +395,36 @@ export default function QuickEstimate() {
     testResult.memory_analysis.weight_gb :
     0;
 
+  // Get actual weight precision being used (detected from HF config or user-selected)
+  const actualWeightPrecision = React.useMemo(() => {
+    if (!hfConfig || !hfConfig.quantization_config) {
+      return testWeightPrecision; // No HF config, use user selection
+    }
+
+    const qconfig = hfConfig.quantization_config as any;
+    const quantMethod = qconfig.quant_method || qconfig.quant_type || qconfig.quantization_algo;
+
+    if (!quantMethod || quantMethod === 'none') {
+      return testWeightPrecision; // No quantization, use user selection
+    }
+
+    // Map quantization method to display format
+    const method = quantMethod.toLowerCase();
+    if (method.includes('fp8') || method === 'fp8') return 'FP8';
+    if (method.includes('int8') || method === 'int8') return 'INT8';
+    if (method.includes('int4') || method === 'int4') return 'INT4';
+    if (method === 'gptq' || method === 'awq') {
+      // Check bits field for GPTQ/AWQ
+      const bits = qconfig.bits || qconfig.num_bits || 4;
+      if (bits === 8) return 'INT8';
+      if (bits === 4) return 'INT4';
+      return 'INT4'; // Default to INT4 for GPTQ/AWQ
+    }
+    if (method === 'bnb' || method.includes('bitsandbytes')) return 'INT4';
+
+    return testWeightPrecision; // Unknown, fall back to user selection
+  }, [hfConfig, testWeightPrecision]);
+
   const realKVPerReqMB = testResult && testResult.memory_analysis.kv_cache_used_gb ?
     (testResult.memory_analysis.kv_cache_used_gb / testConcurrentUsers) * 1000 : // Convert GB to MB
     0;
@@ -706,12 +736,13 @@ export default function QuickEstimate() {
     {
       id: 'memory', title: 'Precision & memory',
       summary: [
-        { k: 'weights', v: testWeightPrecision },
+        { k: 'weights', v: actualWeightPrecision },
         { k: 'KV', v: testKVCachePrecision }
       ],
       fields: [
         {
-          label: 'Weight precision',
+          label: actualWeightPrecision !== testWeightPrecision ?
+            'Weight precision (overridden by model quantization_config)' : 'Weight precision',
           value: testWeightPrecision,
           type: 'select' as const,
           options: ['FP16', 'FP8', 'INT8', 'INT4'] as const,
