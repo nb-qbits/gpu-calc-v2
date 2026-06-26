@@ -88,7 +88,7 @@ export interface MoEInfo {
 }
 
 export interface QuantizationConfig {
-  type:                    'fp8' | 'gptq' | 'awq' | 'bnb' | 'none' | 'unknown'
+  type:                    'fp8' | 'int8' | 'int4' | 'gptq' | 'awq' | 'bnb' | 'none' | 'unknown'
   bits?:                   number
   group_size?:             number
   modules_to_not_convert?: string[]

@@ -8,6 +8,7 @@ import { computeVLLMConfig } from './vllm-defaults'
 import { classifyBottleneck } from './bottleneck'
 import { determineParallelismStrategy } from './parallelism'
 import { computeLLMDConfig } from './llmd'
+import { getStorageBytesPerParam, estimateWeightMemoryBytes } from './weight-memory'
 
 // Import from existing KV cache engine
 import { GPU_CATALOG } from '../gpus'
@@ -177,6 +178,7 @@ export function computeInferenceConfig(
   // ═══ STEP 3: COMPUTE WEIGHT MEMORY ═══
 
   let params_billions: number
+  let weight_gb: number
 
   if (useHFConfig && req.hf_config) {
     // Use existing config extraction (handles MoE, MLA, sliding window, all field variants)
@@ -185,6 +187,18 @@ export function computeInferenceConfig(
     console.log(`📊 Extracted config: ${cfg.model_type}, layers=${cfg.L}, hidden=${cfg.hidden_size}, is_moe=${cfg.is_moe}`)
     if (cfg.is_moe) {
       console.log(`   MoE: ${cfg.total_routed_experts} routed + ${cfg.shared_experts} shared, ${cfg.active_routed_per_tok} active/tok`)
+    }
+
+    // Check for quantization
+    const quantConfig = cfg.quantization_config
+    if (quantConfig.type !== 'none' && quantConfig.type !== 'unknown') {
+      console.log(`🔬 Quantization detected: ${quantConfig.type}${quantConfig.quant_type ? ` (${quantConfig.quant_type})` : ''}`)
+      if (quantConfig.bits) {
+        console.log(`   Bits: ${quantConfig.bits}`)
+      }
+      if (quantConfig.modules_to_not_convert && quantConfig.modules_to_not_convert.length > 0) {
+        console.log(`   Modules not converted: ${quantConfig.modules_to_not_convert.length} (e.g., ${quantConfig.modules_to_not_convert.slice(0, 3).join(', ')})`)
+      }
     }
 
     // Embedding params
@@ -222,6 +236,14 @@ export function computeInferenceConfig(
     params_billions = total_params / 1e9
 
     console.log(`📊 ${params_billions.toFixed(1)}B params (${cfg.is_moe ? 'MoE' : 'dense'})`)
+
+    // Compute weight memory respecting quantization from config.json
+    // For quantized models (FP8, INT8, INT4, GPTQ, AWQ), this uses the actual
+    // storage dtype (e.g., 1 byte for FP8) rather than the compute dtype.
+    const weight_bytes = estimateWeightMemoryBytes(cfg)
+    weight_gb = weight_bytes / 1e9
+
+    console.log(`💾 Weight memory: ${weight_gb.toFixed(1)} GB (quantization-aware)`)
   } else if (model) {
     // Extract parameter count from paramLabel (e.g., "70B" → 70)
     const paramMatch = model.paramLabel.match(/(\d+)B/)
@@ -229,18 +251,26 @@ export function computeInferenceConfig(
       throw new Error(`Cannot parse parameter count from "${model.paramLabel}"`)
     }
     params_billions = parseInt(paramMatch[1], 10)
+
+    // For catalog models without HF config, use user-selected precision
+    const bytes_per_param: Record<string, number> = {
+      FP16: 2, FP8: 1, INT8: 1, INT4: 0.5
+    }
+    weight_gb = (params_billions * 1e9 * bytes_per_param[req.precision]) / 1e9
+    console.log(`💾 Weight memory: ${weight_gb.toFixed(1)} GB (precision=${req.precision})`)
   } else {
     // Unknown model - estimate from model name
     const sizeMatch = req.model_name.match(/(\d+)B/i)
     params_billions = sizeMatch ? parseInt(sizeMatch[1], 10) : 7
     console.log(`📊 ${params_billions.toFixed(1)}B params (estimated from model name)`)
-  }
 
-  // Compute weight memory based on precision
-  const bytes_per_param: Record<string, number> = {
-    FP16: 2, FP8: 1, INT8: 1, INT4: 0.5
+    // Use user-selected precision for unknown models
+    const bytes_per_param: Record<string, number> = {
+      FP16: 2, FP8: 1, INT8: 1, INT4: 0.5
+    }
+    weight_gb = (params_billions * 1e9 * bytes_per_param[req.precision]) / 1e9
+    console.log(`💾 Weight memory: ${weight_gb.toFixed(1)} GB (precision=${req.precision})`)
   }
-  const weight_gb = (params_billions * 1e9 * bytes_per_param[req.precision]) / 1e9
 
   // ═══ STEP 4: COMPUTE TP SIZE & REPLICAS ═══
 

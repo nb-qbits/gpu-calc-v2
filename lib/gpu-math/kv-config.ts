@@ -55,8 +55,8 @@ function extractQuantConfig(raw: Record<string, unknown>): QuantizationConfig {
     (qcfg.quant_method as string | undefined) ??
     'unknown'
 
-  const type = (['fp8', 'gptq', 'awq', 'bnb', 'none'] as const).includes(
-    rawType as 'fp8' | 'gptq' | 'awq' | 'bnb' | 'none'
+  const type = (['fp8', 'int8', 'int4', 'gptq', 'awq', 'bnb', 'none'] as const).includes(
+    rawType as 'fp8' | 'int8' | 'int4' | 'gptq' | 'awq' | 'bnb' | 'none'
   )
     ? (rawType as QuantizationConfig['type'])
     : 'unknown'
@@ -320,27 +320,7 @@ function deriveComputeDtype(torchDtype: string): string {
 }
 
 // ─── Weight memory fallback estimate ─────────────────────────────────────────
-// Used only when safetensors and HF API lookups both fail.
-// NEVER parses model name strings.
+// Re-exported from inference-config/weight-memory for backward compatibility.
+// That module has the quantization-aware implementation.
 
-export function estimateWeightMemoryBytes(cfg: ExtractedConfig): number {
-  const B = cfg.B
-  const attnPerLayer =
-    cfg.H_q  * cfg.d * cfg.hidden_size +  // Q
-    cfg.H_kv * cfg.d * cfg.hidden_size +  // K
-    cfg.H_kv * cfg.d * cfg.hidden_size +  // V
-    cfg.H_q  * cfg.d * cfg.hidden_size    // O
-
-  let ffnPerLayer: number
-  if (cfg.is_moe && cfg.total_routed_experts != null) {
-    const expertSize = cfg.moe_intermediate_size ?? cfg.intermediate_size
-    ffnPerLayer =
-      cfg.total_routed_experts * cfg.hidden_size * expertSize * 3 +
-      cfg.shared_experts * cfg.hidden_size * expertSize * 3
-  } else {
-    ffnPerLayer = cfg.hidden_size * cfg.intermediate_size * 3
-  }
-
-  const embedding = cfg.vocab_size * cfg.hidden_size
-  return ((attnPerLayer + ffnPerLayer) * cfg.L + embedding) * B
-}
+export { estimateWeightMemoryBytes, getStorageBytesPerParam } from './inference-config/weight-memory'
