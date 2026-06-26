@@ -1253,7 +1253,7 @@ export default function QuickEstimate() {
                 <span className={styles.tileValue}>{Math.round(weight)}<span className={styles.tileUnit}>GB</span></span>
                 <span className={styles.tileSub}>
                   {testResult ? (
-                    <>{model.split('/')[1] || model} · {testWeightPrecision}</>
+                    <>{model.split('/')[1] || model} · {actualWeightPrecision}</>
                   ) : (
                     <>{model.split('/')[1] || model}</>
                   )}
@@ -1266,11 +1266,11 @@ export default function QuickEstimate() {
               <div className={styles.formula}>
                 {testResult ? (
                   <>
-                    precision = <span className={styles.em}>{testWeightPrecision}</span><br />
+                    precision = <span className={styles.em}>{actualWeightPrecision}</span><br />
                     bytes/param = <span className={styles.em}>
-                      {testWeightPrecision === 'FP16' ? '2' :
-                       testWeightPrecision === 'FP8' ? '1' :
-                       testWeightPrecision === 'INT8' ? '1' : '0.5'}
+                      {actualWeightPrecision === 'FP16' ? '2' :
+                       actualWeightPrecision === 'FP8' ? '1' :
+                       actualWeightPrecision === 'INT8' ? '1' : '0.5'}
                     </span><br />
                     params × bytes/param<br />
                     = <span className={styles.em}>{testResult.memory_analysis.weight_gb.toFixed(1)} GB</span>
@@ -1493,7 +1493,7 @@ export default function QuickEstimate() {
                   <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '4px' }}>
                     <strong style={{ color: '#0066cc' }}>Memory Breakdown</strong>
                     <div style={{ marginTop: '8px', fontSize: '13px', lineHeight: '1.6' }}>
-                      • Weight memory: <strong>{testResult.memory_analysis.weight_gb.toFixed(1)} GB</strong> ({testWeightPrecision})<br/>
+                      • Weight memory: <strong>{testResult.memory_analysis.weight_gb.toFixed(1)} GB</strong> ({actualWeightPrecision})<br/>
                       • Weight per GPU: <strong>{testResult.memory_analysis.weight_gb_per_gpu.toFixed(1)} GB</strong><br/>
                       • Usable per GPU: <strong>{testResult.memory_analysis.usable_hbm_per_gpu.toFixed(0)} GB</strong> (90% of {gpu.includes('H200') ? '141' : '80'} GB)<br/>
                       • Tensor Parallel size: <strong>{testResult.memory_analysis.tp_size}</strong> {testResult.memory_analysis.weight_gb > testResult.memory_analysis.usable_hbm_per_gpu ? '(required - weights don\'t fit in 1 GPU)' : '(weights fit, but using for replicas)'}
