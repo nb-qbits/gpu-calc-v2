@@ -2,7 +2,9 @@
 
 LLM inference sizing, GPU comparison, and cost modeling for engineers and infrastructure teams.
 
-Live at **[gpu-calc.vercel.app](https://gpu-calc.vercel.app)** · Built with Next.js + PatternFly + Red Hat design system.
+**🚀 Live at [gpu-calc-v2.vercel.app](https://gpu-calc-v2.vercel.app/quick-estimate)**
+
+Built with Next.js + PatternFly + Red Hat design system.
 
 ## What it does
 
