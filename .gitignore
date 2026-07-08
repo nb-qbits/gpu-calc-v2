@@ -38,3 +38,6 @@ Thumbs.db
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Superpowers plan docs
+docs/superpowers/
