@@ -44,16 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               padding: "0 1rem",
             }}
           >
-            <svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true">
-              <circle cx="10" cy="10" r="10" fill="#ee0000" />
-              <path
-                d="M5 13 L10 6 L15 13"
-                stroke="white"
-                strokeWidth="2"
-                fill="none"
-                strokeLinejoin="round"
-              />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/redhat-hat.svg" alt="" width={40} height={30} aria-hidden="true" />
             <span
               style={{
                 fontFamily: "var(--font-display)",
