@@ -22,10 +22,10 @@ import Link from "next/link";
 
 const tools = [
   {
-    title: "Quick Estimate",
+    title: "KV Cache Calculator",
     description:
-      "Fast GPU memory and throughput estimate from model size and serving parameters.",
-    href: "/quick-estimate",
+      "Calculate KV cache memory requirements for any model on supported GPU systems.",
+    href: "/kv-cache",
     icon: <CalculatorIcon />,
   },
   {

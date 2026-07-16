@@ -112,6 +112,15 @@ export const GPU_OPTIONS_ADV = GPU_CATALOG
     systemId: g.sizer_system_id,
   }))
 
+// GPUs available for KV Cache Calculator (AIConfigurator kv_cache_calc endpoint)
+export const GPU_OPTIONS_KV = [
+  { systemId: 'a100_sxm',  label: 'NVIDIA A100 80GB SXM' },
+  { systemId: 'h100_sxm',  label: 'NVIDIA H100 80GB SXM' },
+  { systemId: 'h200_sxm',  label: 'NVIDIA H200 141GB SXM' },
+  { systemId: 'b200_sxm',  label: 'NVIDIA B200 192GB SXM' },
+  { systemId: 'gb200',     label: 'NVIDIA GB200' },
+]
+
 // Backward compatibility - map new JSON schema to old API response format
 export interface GpuSpecLegacy {
   id: string

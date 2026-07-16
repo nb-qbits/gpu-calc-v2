@@ -1,0 +1,393 @@
+/* ============================================================================
+   KV Cache Calculator — UI styling
+   Follows QuickEstimate.module.css / routing.module.css patterns.
+   Uses --gc-* theme tokens with safe fallbacks.
+   NO font-size below 11.5px; no text lighter than --gc-text-2.
+   ============================================================================ */
+
+.page {
+  --t:   var(--gc-text,   #151515);
+  --t2:  var(--gc-text-2, #3c3f42);
+  --t3:  var(--gc-text-3, #54585c);
+  --bg:  var(--gc-bg,     #ffffff);
+  --bg2: var(--gc-bg-2,   #f5f5f5);
+  --bg3: var(--gc-bg-3,   #e0e0e0);
+  --line:  var(--gc-border, #d2d2d2);
+  --line2: var(--gc-border-strong, #b8bbbe);
+  --blue:   var(--gc-link, #0066cc);
+  --ok:     var(--gc-success, #3e8635);
+
+  --display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --sans:    "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  --radius: 6px;
+
+  font-family: var(--sans);
+  color: var(--t);
+  font-size: 15px;
+  line-height: 1.5;
+  max-width: 1920px;
+  padding: 24px 32px 64px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- header ---------- */
+.header { margin-bottom: 20px; }
+.pageTitle {
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 8px 0 4px;
+}
+.subtitle { font-size: 15px; color: var(--t2); margin: 0; }
+
+/* ---------- input card ---------- */
+.inputCard {
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.inputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  align-items: end;
+}
+@media (max-width: 700px) {
+  .inputRow { grid-template-columns: 1fr; }
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.fieldLabel {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+
+.modelInputWrapper {
+  position: relative;
+  width: 100%;
+}
+.modelInput {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #b8bbbe;
+  border-radius: 4px;
+  padding: 6px 140px 6px 12px;
+  font-size: 14px;
+  font-family: var(--sans);
+  color: var(--t);
+  background: #ffffff;
+}
+.modelInput:focus { border-color: var(--blue); outline: none; }
+
+.modelChip {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.modelChipCatalog {
+  background: rgba(62, 134, 53, 0.12);
+  color: #3e8635;
+}
+.modelChipCustom {
+  background: rgba(0, 102, 204, 0.12);
+  color: #0066cc;
+}
+
+.gpuSelect {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #b8bbbe;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-family: var(--sans);
+  color: var(--t);
+  background: #ffffff;
+  cursor: pointer;
+}
+.gpuSelect:focus { border-color: var(--blue); outline: none; }
+
+.calcBtn {
+  height: 40px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 4px;
+  background: var(--blue);
+  color: #ffffff;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 150ms ease;
+}
+.calcBtn:hover { background: #004d99; }
+.calcBtn:disabled {
+  background: #b8bbbe;
+  cursor: not-allowed;
+}
+
+/* ---------- result tiles ---------- */
+.tilesGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 1100px) { .tilesGrid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .tilesGrid { grid-template-columns: 1fr; } }
+
+.tileCard {
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 160px;
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+.tileCard:hover {
+  transform: scale(1.03) translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+  z-index: 10;
+}
+.tileCard:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.tileDark {
+  background: #151515;
+  border-color: #151515;
+  color: #fff;
+}
+.tileDark .tileLabel { color: rgba(255,255,255,0.7); }
+.tileDark .tileSub { color: rgba(255,255,255,0.65); }
+.tileDark .seeMath { color: rgba(255,255,255,0.5); }
+.tileDark:hover .seeMath { color: rgba(255,255,255,0.9); }
+
+.tileLabel {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.tileValue {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 32px;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  margin-top: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--t);
+}
+.tileDark .tileValue { color: #fff; }
+
+.tileUnit {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+.tileSub {
+  font-size: 13px;
+  color: var(--t2);
+  margin-top: 6px;
+}
+.seeMath {
+  margin-top: auto;
+  padding-top: 10px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--t3);
+}
+.tileCard:hover .seeMath { color: var(--blue); }
+
+/* Back face (details) */
+.backTitle {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t2);
+  margin-bottom: 12px;
+}
+.tileDark .backTitle { color: rgba(255,255,255,0.7); }
+
+.backRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.tileDark .backRow { border-bottom-color: rgba(255,255,255,0.1); }
+.backRowLabel {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--t2);
+}
+.tileDark .backRowLabel { color: rgba(255,255,255,0.6); }
+.backRowValue {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t);
+}
+.tileDark .backRowValue { color: #fff; }
+
+/* ---------- memory breakdown bar ---------- */
+.breakdownSection {
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.breakdownTitle {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--t);
+}
+.memoryBar {
+  width: 100%;
+  height: 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  background: var(--bg3);
+}
+.memorySegment {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+  min-width: 0;
+}
+.breakdownLegend {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--t2);
+  flex-wrap: wrap;
+}
+.legendDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* ---------- model config table ---------- */
+.configSection {
+  background: #ffffff;
+  border: 1px solid #d2d2d2;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+}
+.configTitle {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--t);
+}
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 24px;
+}
+.configItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.configLabel {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t2);
+}
+.configValue {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--t);
+}
+
+/* ---------- placeholder / loading / error ---------- */
+.placeholder {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--t3);
+  font-size: 15px;
+}
+.loadingWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 16px;
+  color: var(--t2);
+  font-size: 14px;
+}
+.errorAlert {
+  margin-bottom: 24px;
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .tileCard { transition: none; }
+  .tileCard:hover { transform: none; box-shadow: none; }
+}

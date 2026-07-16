@@ -24,3 +24,11 @@ export function formatThroughput(tps: number): string {
   if (tps >= 1000) return `${formatNumber(tps / 1000, 1)}k tok/s`;
   return `${formatNumber(tps, 0)} tok/s`;
 }
+
+/** Format a byte count using binary units (GiB, MiB, KiB) */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1_073_741_824) return `${formatNumber(bytes / 1_073_741_824, 2)} GiB`;
+  if (bytes >= 1_048_576) return `${formatNumber(bytes / 1_048_576, 2)} MiB`;
+  if (bytes >= 1024) return `${formatNumber(bytes / 1024, 2)} KiB`;
+  return `${bytes} B`;
+}
