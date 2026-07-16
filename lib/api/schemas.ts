@@ -45,3 +45,18 @@ export const ModelCatalogQuerySchema = z.object({
 })
 
 export type ModelCatalogQuery = z.infer<typeof ModelCatalogQuerySchema>
+
+// ═══ GPU SIZER REQUEST SCHEMA ═══
+
+export const GpuSizerRequestSchema = z.object({
+  model_path: z.string().min(1, 'model_path is required'),
+  system: z.string().min(1, 'system is required'),
+  isl: z.number().int().positive('isl must be a positive integer'),
+  osl: z.number().int().positive('osl must be a positive integer'),
+  ttft: z.number().positive('ttft must be a positive number (milliseconds)'),
+  tps_per_user: z.number().positive('tps_per_user must be positive').optional(),
+  e2e: z.number().positive('e2e must be positive').optional(),
+  batch_size: z.number().int().positive('batch_size must be a positive integer').optional(),
+}).strict()
+
+export type GpuSizerRequest = z.infer<typeof GpuSizerRequestSchema>

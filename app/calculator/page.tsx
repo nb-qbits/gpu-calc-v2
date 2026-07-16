@@ -1,24 +1,11 @@
 "use client";
-import { PageSection, Title, TextContent, EmptyState, EmptyStateBody } from "@patternfly/react-core";
-import { CubesIcon } from "@patternfly/react-icons";
+import { PageSection } from "@patternfly/react-core";
+import AdvancedEstimate from "./AdvancedEstimate";
 
 export default function CalculatorPage() {
   return (
-    <>
-      <PageSection variant="light">
-        <TextContent>
-          <Title headingLevel="h1" size="2xl">Advanced Calculator</Title>
-        </TextContent>
-      </PageSection>
-      <PageSection>
-        <EmptyState>
-          <CubesIcon />
-          <Title headingLevel="h2" size="lg">Coming soon</Title>
-          <EmptyStateBody>
-            This tool is being ported from the original gpu-calc static site.
-          </EmptyStateBody>
-        </EmptyState>
-      </PageSection>
-    </>
+    <PageSection style={{ padding: 0, background: '#f5f5f5' }}>
+      <AdvancedEstimate />
+    </PageSection>
   );
 }

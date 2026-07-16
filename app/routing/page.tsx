@@ -1,24 +1,19 @@
-"use client";
-import { PageSection, Title, TextContent, EmptyState, EmptyStateBody } from "@patternfly/react-core";
-import { CubesIcon } from "@patternfly/react-icons";
+'use client'
 
-export default function RoutingPage() {
+import { PageSection } from '@patternfly/react-core'
+import RoutingEconomics from './RoutingEconomics'
+
+export default function Page() {
   return (
-    <>
-      <PageSection variant="light">
-        <TextContent>
-          <Title headingLevel="h1" size="2xl">Routing Economics</Title>
-        </TextContent>
-      </PageSection>
-      <PageSection>
-        <EmptyState>
-          <CubesIcon />
-          <Title headingLevel="h2" size="lg">Coming soon</Title>
-          <EmptyStateBody>
-            This tool is being ported from the original gpu-calc static site.
-          </EmptyStateBody>
-        </EmptyState>
-      </PageSection>
-    </>
-  );
+    <PageSection
+      padding={{ default: 'noPadding' }}
+      style={{
+        backgroundColor: 'var(--gc-bg-2, #f5f5f5)',
+        minHeight: '100vh',
+        padding: 0,
+      }}
+    >
+      <RoutingEconomics />
+    </PageSection>
+  )
 }

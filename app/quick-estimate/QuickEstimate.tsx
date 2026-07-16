@@ -30,7 +30,7 @@ import { ProductTour, type TourStep } from '@/components/ProductTour';
 import { SaveEstimateModal } from './SaveEstimateModal';
 import { computeInferenceConfig } from '@/lib/gpu-math/inference-config';
 import { MODEL_CATALOG } from '@/lib/gpu-math/models';
-import { GPU_CATALOG } from '@/lib/gpu-math/gpus';
+import { GPU_CATALOG, GPU_OPTIONS_QE } from '@/lib/gpu-math/gpus';
 import { fetchModelConfig, type HFModelConfig } from '@/lib/huggingface/fetch-config';
 import { saveEstimate, getSavedEstimateCount } from '@/lib/saved-estimates';
 import type { InferenceConfigResult } from '@/lib/gpu-math/inference-config';
@@ -39,10 +39,7 @@ import Link from 'next/link';
 // Generate model options from actual MODEL_CATALOG
 const MODEL_OPTIONS = MODEL_CATALOG.map(m => m.hfId);
 
-const GPU_OPTIONS = [
-  'NVIDIA H100 80GB', 'NVIDIA H200 141GB', 'NVIDIA A100 80GB',
-  'NVIDIA A100 40GB', 'NVIDIA L40S 48GB', 'AMD MI300X 192GB',
-];
+const GPU_OPTIONS = GPU_OPTIONS_QE.map(g => g.label);
 
 const QUICK_ESTIMATE_TOUR: TourStep[] = [
   {
@@ -80,7 +77,9 @@ const QUICK_ESTIMATE_TOUR: TourStep[] = [
 export default function QuickEstimate() {
   console.log('🔵 QuickEstimate component mounting');
   const [model, setModel] = React.useState('nvidia/Nemotron-Mini-4B-Instruct');
-  const [gpu, setGpu] = React.useState('NVIDIA H200 141GB');
+  const [gpu, setGpu] = React.useState(
+    GPU_OPTIONS.find(g => g.includes('H200')) ?? GPU_OPTIONS[0]
+  );
   const [fav, setFav] = React.useState(false);
   const [showHf, setShowHf] = React.useState(false);
   const [hfToken, setHfToken] = React.useState('');
@@ -138,19 +137,9 @@ export default function QuickEstimate() {
   // Live pricing from Cloudflare Worker
   const [livePricing, setLivePricing] = React.useState<Record<string, number>>({});
 
-  // Map UI GPU names to catalog IDs
   const mapGpuToCatalogId = (uiGpuName: string): string => {
-    // UI format: "NVIDIA H200 141GB" -> catalog format: "h200-141gb"
-    const mapping: Record<string, string> = {
-      'NVIDIA H100 80GB': 'h100-80gb',
-      'NVIDIA H200 141GB': 'h200-141gb',
-      'NVIDIA A100 80GB': 'a100-80gb',
-      'NVIDIA A100 40GB': 'a100-40gb',
-      'NVIDIA L40S 48GB': 'l40s-48gb',
-      'AMD MI300X 192GB': 'mi300x-192gb',
-    };
-
-    return mapping[uiGpuName] || uiGpuName.toLowerCase().replace(/\s+/g, '-');
+    const match = GPU_OPTIONS_QE.find(g => g.label === uiGpuName);
+    return match?.id ?? uiGpuName.toLowerCase().replace(/\s+/g, '-');
   };
 
   // Add loading state
@@ -431,9 +420,7 @@ export default function QuickEstimate() {
 
   // Use live pricing if available, fallback to estimated pricing from hardware cost
   // Map UI GPU names to catalog IDs
-  const catalogGpuForPricing = GPU_CATALOG.find(g =>
-    gpu.includes(g.name) || g.name.includes(gpu.replace('NVIDIA ', '').replace('AMD ', ''))
-  );
+  const catalogGpuForPricing = GPU_CATALOG.find(g => g.id === mapGpuToCatalogId(gpu));
 
   // Map UI GPU names to pricing keys (e.g., "NVIDIA H200 141GB" -> "H200")
   const gpuPricingKey = gpu.includes('H200') ? 'H200' :

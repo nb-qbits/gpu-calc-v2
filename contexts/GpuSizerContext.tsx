@@ -1,0 +1,128 @@
+'use client';
+
+import * as React from 'react';
+import type { GpuSizerResult } from '@/lib/api/gpu-sizer';
+
+interface GpuSizerParams {
+  model_path: string;
+  system: string;
+  isl: number;
+  osl: number;
+  ttft: number;
+}
+
+interface GpuSizerState {
+  params: GpuSizerParams | null;
+  isLoading: boolean;
+  result: GpuSizerResult | null;
+  error: string | null;
+  errorCode: string | null;
+  elapsed: number;
+  startSizing: (params: GpuSizerParams) => void;
+  reset: () => void;
+}
+
+const GpuSizerContext = React.createContext<GpuSizerState>({
+  params: null,
+  isLoading: false,
+  result: null,
+  error: null,
+  errorCode: null,
+  elapsed: 0,
+  startSizing: () => {},
+  reset: () => {},
+});
+
+export function GpuSizerProvider({ children }: { children: React.ReactNode }) {
+  const [params, setParams] = React.useState<GpuSizerParams | null>(null);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [result, setResult] = React.useState<GpuSizerResult | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [errorCode, setErrorCode] = React.useState<string | null>(null);
+  const [elapsed, setElapsed] = React.useState(0);
+
+  const abortRef = React.useRef<AbortController | null>(null);
+  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearTimer = React.useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!isLoading) { clearTimer(); return; }
+    setElapsed(0);
+    timerRef.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    return clearTimer;
+  }, [isLoading, clearTimer]);
+
+  const startSizing = React.useCallback((p: GpuSizerParams) => {
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setParams(p);
+    setIsLoading(true);
+    setResult(null);
+    setError(null);
+    setErrorCode(null);
+
+    fetch('/api/v1/gpu-sizer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model_path: p.model_path,
+        system: p.system,
+        isl: p.isl,
+        osl: p.osl,
+        ttft: p.ttft,
+      }),
+      signal: controller.signal,
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (controller.signal.aborted) return;
+        if (data.status === 'failed') {
+          setError(data.error?.message || 'Unknown error');
+          setErrorCode(data.error?.code || 'UNKNOWN');
+        } else {
+          setResult(data as GpuSizerResult);
+        }
+      })
+      .catch(err => {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setError(err instanceof Error ? err.message : 'Network error');
+        setErrorCode('NETWORK_ERROR');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+  }, []);
+
+  const reset = React.useCallback(() => {
+    if (abortRef.current) abortRef.current.abort();
+    setIsLoading(false);
+    setResult(null);
+    setError(null);
+    setErrorCode(null);
+    setElapsed(0);
+    setParams(null);
+  }, []);
+
+  const value = React.useMemo<GpuSizerState>(
+    () => ({ params, isLoading, result, error, errorCode, elapsed, startSizing, reset }),
+    [params, isLoading, result, error, errorCode, elapsed, startSizing, reset]
+  );
+
+  return (
+    <GpuSizerContext.Provider value={value}>
+      {children}
+    </GpuSizerContext.Provider>
+  );
+}
+
+export function useGpuSizer(): GpuSizerState {
+  return React.useContext(GpuSizerContext);
+}

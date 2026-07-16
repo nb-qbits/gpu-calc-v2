@@ -8,23 +8,39 @@ import "@patternfly/react-styles/css/layouts/Stack/stack.css";
 import "@patternfly/react-styles/css/layouts/Split/split.css";
 import "@patternfly/react-styles/css/layouts/Gallery/gallery.css";
 import "@patternfly/react-styles/css/layouts/Bullseye/bullseye.css";
-// Components used across the app
-import "@patternfly/react-styles/css/components/Button/button.css";
+// Shell components (Page, Masthead, Nav)
+import "@patternfly/react-styles/css/components/Page/page.css";
+import "@patternfly/react-styles/css/components/Masthead/masthead.css";
+import "@patternfly/react-styles/css/components/Brand/brand.css";
 import "@patternfly/react-styles/css/components/Nav/nav.css";
-import "@patternfly/react-styles/css/components/Card/card.css";
+// Content & typography
+import "@patternfly/react-styles/css/components/Title/title.css";
+import "@patternfly/react-styles/css/components/Content/content.css";
+// Components used across the app
+import "@patternfly/react-styles/css/components/Accordion/accordion.css";
 import "@patternfly/react-styles/css/components/Alert/alert.css";
+import "@patternfly/react-styles/css/components/Backdrop/backdrop.css";
+import "@patternfly/react-styles/css/components/Button/button.css";
+import "@patternfly/react-styles/css/components/Card/card.css";
+import "@patternfly/react-styles/css/components/DescriptionList/description-list.css";
 import "@patternfly/react-styles/css/components/ExpandableSection/expandable-section.css";
+import "@patternfly/react-styles/css/components/Form/form.css";
+import "@patternfly/react-styles/css/components/FormControl/form-control.css";
+import "@patternfly/react-styles/css/components/HelperText/helper-text.css";
+import "@patternfly/react-styles/css/components/Label/label.css";
+import "@patternfly/react-styles/css/components/ModalBox/modal-box.css";
+import "@patternfly/react-styles/css/components/Popover/popover.css";
 import "@patternfly/react-styles/css/components/Progress/progress.css";
 import "@patternfly/react-styles/css/components/Slider/slider.css";
+import "@patternfly/react-styles/css/components/Spinner/spinner.css";
+import "@patternfly/react-styles/css/components/Switch/switch.css";
 import "@patternfly/react-styles/css/components/Tile/tile.css";
 import "@patternfly/react-styles/css/components/ToggleGroup/toggle-group.css";
-import "@patternfly/react-styles/css/components/DescriptionList/description-list.css";
-import "@patternfly/react-styles/css/components/Form/form.css";
-import "@patternfly/react-styles/css/components/Label/label.css";
-import "@patternfly/react-styles/css/components/Switch/switch.css";
+import "@patternfly/react-styles/css/components/Tooltip/tooltip.css";
 import "./globals.css";
 import "./theme.css";
 import { AppShell } from "@/components/layout/AppShell";
+import { GpuSizerProvider } from "@/contexts/GpuSizerContext";
 
 const redHatDisplay = Red_Hat_Display({
   subsets: ["latin"],
@@ -69,7 +85,9 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <AppShell>{children}</AppShell>
+        <GpuSizerProvider>
+          <AppShell>{children}</AppShell>
+        </GpuSizerProvider>
       </body>
     </html>
   );

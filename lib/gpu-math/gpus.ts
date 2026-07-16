@@ -7,6 +7,8 @@ export interface GpuSpec {
   // New JSON schema fields (from gpu-catalog.json)
   id: string
   name: string
+  display_name: string
+  sizer_system_id: string | null
   vendor: 'nvidia' | 'amd'
   vram_gb: number
   hardware_cost_usd: number
@@ -94,6 +96,21 @@ export function getGpusByMinVram(minVram: number): GpuSpec[] {
 
 // Default GPU for initial state
 export const DEFAULT_GPU = GPU_CATALOG.find(gpu => gpu.id === 'h100-80gb') || GPU_CATALOG[0]
+
+// GPUs available for Quick Estimate (all catalog GPUs with a display name)
+export const GPU_OPTIONS_QE = GPU_CATALOG.map(g => ({
+  id: g.id,
+  label: g.display_name,
+}))
+
+// GPUs available for Advanced Estimate (only those the external sizer API supports)
+export const GPU_OPTIONS_ADV = GPU_CATALOG
+  .filter((g): g is GpuSpec & { sizer_system_id: string } => g.sizer_system_id !== null)
+  .map(g => ({
+    id: g.id,
+    label: g.display_name,
+    systemId: g.sizer_system_id,
+  }))
 
 // Backward compatibility - map new JSON schema to old API response format
 export interface GpuSpecLegacy {

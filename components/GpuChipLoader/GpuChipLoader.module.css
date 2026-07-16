@@ -1,0 +1,164 @@
+/* ============================================================================
+   GPU Chip Loader — animated loading visualization
+   ============================================================================ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  gap: 28px;
+}
+
+.chipAndPhases {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+@media (max-width: 700px) {
+  .chipAndPhases {
+    flex-direction: column;
+    gap: 24px;
+  }
+}
+
+/* ---------- SVG chip ---------- */
+.chip {
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px rgba(0, 102, 204, 0.15));
+  animation: chipGlow 3s ease-in-out infinite;
+}
+
+@keyframes chipGlow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(0, 102, 204, 0.1)); }
+  50%      { filter: drop-shadow(0 0 20px rgba(0, 102, 204, 0.3)); }
+}
+
+.pin {
+  fill: #3c3f42;
+  opacity: 0.5;
+  animation: pinPulse 2s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.12s);
+}
+
+@keyframes pinPulse {
+  0%, 100% { fill: #3c3f42; opacity: 0.5; }
+  50%      { fill: #0066cc; opacity: 1; }
+}
+
+.core {
+  fill: #2a2a2a;
+  animation: corePulse 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+@keyframes corePulse {
+  0%, 100% { fill: #2a2a2a; filter: drop-shadow(0 0 0 transparent); }
+  50%      { fill: #0066cc; filter: drop-shadow(0 0 6px rgba(0, 102, 204, 0.6)); }
+}
+
+.trace {
+  stroke: #0066cc;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  opacity: 0.6;
+  animation: traceFlow 1.5s linear infinite;
+  animation-delay: calc(var(--i) * 0.15s);
+}
+
+@keyframes traceFlow {
+  from { stroke-dashoffset: 24; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ---------- Phase list ---------- */
+.phases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 260px;
+}
+
+.phase {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  color: #8a8d90;
+  transition: color 300ms ease, opacity 300ms ease;
+}
+
+.phaseActive {
+  color: #151515;
+  font-weight: 500;
+}
+
+.phaseDone {
+  color: #3c3f42;
+}
+
+.checkIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #3e8635;
+}
+
+.pendingDot {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pendingDot::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d2d2d2;
+}
+
+.activeDot {
+  composes: pendingDot;
+}
+
+.activeDot::after {
+  background: #0066cc;
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.2); }
+}
+
+/* ---------- Timer ---------- */
+.timer {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 13px;
+  color: #6a6e73;
+  letter-spacing: 0.02em;
+}
+
+.timerNote {
+  font-size: 12px;
+  color: #8a8d90;
+  margin-top: 2px;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .chip { animation: none; filter: drop-shadow(0 0 8px rgba(0, 102, 204, 0.15)); }
+  .pin  { animation: none; fill: #0066cc; opacity: 0.7; }
+  .core { animation: none; fill: #0066cc; }
+  .trace { animation: none; }
+  .activeDot::after { animation: none; opacity: 1; transform: scale(1); }
+}
