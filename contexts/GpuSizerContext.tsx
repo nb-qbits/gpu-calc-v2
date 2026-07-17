@@ -18,6 +18,10 @@ interface GpuSizerState {
   error: string | null;
   errorCode: string | null;
   elapsed: number;
+  debugRequest: Record<string, unknown> | null;
+  debugResponse: Record<string, unknown> | null;
+  debugStatus: number | null;
+  debugDuration: number | null;
   startSizing: (params: GpuSizerParams) => void;
   reset: () => void;
 }
@@ -29,6 +33,10 @@ const GpuSizerContext = React.createContext<GpuSizerState>({
   error: null,
   errorCode: null,
   elapsed: 0,
+  debugRequest: null,
+  debugResponse: null,
+  debugStatus: null,
+  debugDuration: null,
   startSizing: () => {},
   reset: () => {},
 });
@@ -40,6 +48,10 @@ export function GpuSizerProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = React.useState<string | null>(null);
   const [errorCode, setErrorCode] = React.useState<string | null>(null);
   const [elapsed, setElapsed] = React.useState(0);
+  const [debugRequest, setDebugRequest] = React.useState<Record<string, unknown> | null>(null);
+  const [debugResponse, setDebugResponse] = React.useState<Record<string, unknown> | null>(null);
+  const [debugStatus, setDebugStatus] = React.useState<number | null>(null);
+  const [debugDuration, setDebugDuration] = React.useState<number | null>(null);
 
   const abortRef = React.useRef<AbortController | null>(null);
   const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
@@ -63,27 +75,42 @@ export function GpuSizerProvider({ children }: { children: React.ReactNode }) {
     const controller = new AbortController();
     abortRef.current = controller;
 
+    const requestBody = {
+      model_path: p.model_path,
+      system: p.system,
+      isl: p.isl,
+      osl: p.osl,
+      ttft: p.ttft,
+    };
+
     setParams(p);
     setIsLoading(true);
     setResult(null);
     setError(null);
     setErrorCode(null);
+    setDebugRequest(requestBody);
+    setDebugResponse(null);
+    setDebugStatus(null);
+    setDebugDuration(null);
+
+    const t0 = performance.now();
 
     fetch('/api/v1/gpu-sizer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model_path: p.model_path,
-        system: p.system,
-        isl: p.isl,
-        osl: p.osl,
-        ttft: p.ttft,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     })
-      .then(res => res.json())
+      .then(res => {
+        if (!controller.signal.aborted) {
+          setDebugStatus(res.status);
+        }
+        return res.json();
+      })
       .then(data => {
         if (controller.signal.aborted) return;
+        setDebugResponse(data as Record<string, unknown>);
+        setDebugDuration(Math.round(performance.now() - t0));
         if (data.status === 'failed') {
           setError(data.error?.message || 'Unknown error');
           setErrorCode(data.error?.code || 'UNKNOWN');
@@ -93,6 +120,7 @@ export function GpuSizerProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(err => {
         if (err instanceof DOMException && err.name === 'AbortError') return;
+        setDebugDuration(Math.round(performance.now() - t0));
         setError(err instanceof Error ? err.message : 'Network error');
         setErrorCode('NETWORK_ERROR');
       })
@@ -109,11 +137,15 @@ export function GpuSizerProvider({ children }: { children: React.ReactNode }) {
     setErrorCode(null);
     setElapsed(0);
     setParams(null);
+    setDebugRequest(null);
+    setDebugResponse(null);
+    setDebugStatus(null);
+    setDebugDuration(null);
   }, []);
 
   const value = React.useMemo<GpuSizerState>(
-    () => ({ params, isLoading, result, error, errorCode, elapsed, startSizing, reset }),
-    [params, isLoading, result, error, errorCode, elapsed, startSizing, reset]
+    () => ({ params, isLoading, result, error, errorCode, elapsed, debugRequest, debugResponse, debugStatus, debugDuration, startSizing, reset }),
+    [params, isLoading, result, error, errorCode, elapsed, debugRequest, debugResponse, debugStatus, debugDuration, startSizing, reset]
   );
 
   return (

@@ -146,7 +146,8 @@ export default function AdvancedEstimate() {
   const [modelStatus, setModelStatus] = React.useState<'idle' | 'fetching' | 'catalog' | 'fetched' | 'error'>('idle');
 
   // GPU sizer (persistent across navigation)
-  const { isLoading, result, error, errorCode, elapsed, startSizing } = useGpuSizer();
+  const { isLoading, result, error, errorCode, elapsed, debugRequest, debugResponse, debugStatus, debugDuration, startSizing } = useGpuSizer();
+  const [debugOpen, setDebugOpen] = React.useState(false);
 
   // Additional constraints accordion
   const [expanded, setExpanded] = React.useState<string[]>(['perf']);
@@ -641,6 +642,48 @@ export default function AdvancedEstimate() {
             </div>
           )}
         </>
+      )}
+
+      {/* ─── Debug panel ─── */}
+      {(debugRequest || debugResponse) && (
+        <div className={styles.debugSection}>
+          <button
+            type="button"
+            className={styles.debugToggle}
+            onClick={() => setDebugOpen(prev => !prev)}
+            aria-expanded={debugOpen}
+          >
+            <span className={styles.debugToggleIcon}>{debugOpen ? '▾' : '▸'}</span>
+            Debug panel
+            {debugStatus !== null && (
+              <span className={`${styles.debugStatusBadge} ${debugStatus >= 200 && debugStatus < 300 ? styles.debugStatusOk : styles.debugStatusErr}`}>
+                {debugStatus}
+              </span>
+            )}
+            {debugDuration !== null && (
+              <span className={styles.debugDuration}>{debugDuration}ms</span>
+            )}
+          </button>
+          {debugOpen && (
+            <div className={styles.debugBody}>
+              <div className={styles.debugPane}>
+                <div className={styles.debugPaneHeader}>Request → POST /api/v1/gpu-sizer</div>
+                <pre className={styles.debugPre}>
+                  {JSON.stringify(debugRequest, null, 2)}
+                </pre>
+              </div>
+              <div className={styles.debugPane}>
+                <div className={styles.debugPaneHeader}>
+                  Response
+                  {debugStatus !== null && ` (${debugStatus})`}
+                </div>
+                <pre className={styles.debugPre}>
+                  {debugResponse ? JSON.stringify(debugResponse, null, 2) : '(no response)'}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

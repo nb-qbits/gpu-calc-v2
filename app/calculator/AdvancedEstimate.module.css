@@ -380,6 +380,91 @@
   margin-top: 8px;
 }
 
+/* ---------- debug panel ---------- */
+.debugSection {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.debugToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: #a0a0a0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.debugToggle:hover { color: #d4d4d4; }
+.debugToggleIcon {
+  font-size: 11px;
+  width: 12px;
+  display: inline-block;
+}
+.debugStatusBadge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 8px;
+  margin-left: 4px;
+}
+.debugStatusOk {
+  background: rgba(62, 134, 53, 0.25);
+  color: #6ccf5e;
+}
+.debugStatusErr {
+  background: rgba(238, 0, 0, 0.2);
+  color: #ff6b6b;
+}
+.debugDuration {
+  font-size: 11.5px;
+  color: #777;
+  margin-left: auto;
+}
+.debugBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #333;
+  border-top: 1px solid #333;
+}
+@media (max-width: 800px) {
+  .debugBody { grid-template-columns: 1fr; }
+}
+.debugPane {
+  background: #1e1e1e;
+  padding: 12px 16px;
+  overflow: auto;
+}
+.debugPaneHeader {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  margin-bottom: 8px;
+}
+.debugPre {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  max-height: 400px;
+  overflow: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flipFace, .memSeg { transition: none; }
   .spinner { animation: none; }
