@@ -8,6 +8,9 @@ import type { KvCacheCalcResult, KvCacheCalcErrorResponse } from '../kv-cache-ca
 const VALID_REQUEST = {
   model_path: 'meta-llama/Llama-3.1-70B-Instruct',
   system: 'h200_sxm',
+  backend: 'vllm',
+  max_num_tokens: 4096,
+  max_batch_size: 128,
 }
 
 const EXTERNAL_RESPONSE = {
@@ -76,6 +79,19 @@ describe('KvCacheCalcRequestSchema', () => {
     const result = KvCacheCalcRequestSchema.safeParse({ ...VALID_REQUEST, password: 'secret' })
     expect(result.success).toBe(false)
   })
+
+  it('applies defaults when optional fields are omitted', () => {
+    const result = KvCacheCalcRequestSchema.safeParse({
+      model_path: 'meta-llama/Llama-3.1-8B',
+      system: 'h100_sxm',
+    })
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.backend).toBe('vllm')
+      expect(result.data.max_num_tokens).toBe(4096)
+      expect(result.data.max_batch_size).toBe(128)
+    }
+  })
 })
 
 // ─── Service Tests ───────────────────────────────────────────────────────────
@@ -109,7 +125,10 @@ describe('callKvCacheCalc', () => {
     expect(r.memoryBreakdown.commOverheadBytes).toBe(0)
     expect(r.gpuCapacity.totalBytes).toBe(85899345920)
     expect(r.metadata.modelPath).toBe('meta-llama/Llama-3.1-70B-Instruct')
+    expect(r.metadata.backend).toBe('vllm')
     expect(r.metadata.system).toBe('h200_sxm')
+    expect(r.metadata.maxNumTokens).toBe(4096)
+    expect(r.metadata.maxBatchSize).toBe(128)
     expect(r.metadata.source).toBe('native')
     expect(r.metadata.durationMs).toBeGreaterThanOrEqual(0)
   })
@@ -123,6 +142,18 @@ describe('callKvCacheCalc', () => {
     const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body)
     expect(sentBody.username).toBe('test-user')
     expect(sentBody.password).toBe('test-pass')
+  })
+
+  it('sends backend, max_num_tokens, max_batch_size in the upstream request', async () => {
+    const mockFetch = mockFetchOk(EXTERNAL_RESPONSE)
+    vi.stubGlobal('fetch', mockFetch)
+
+    await callKvCacheCalc(VALID_REQUEST)
+
+    const sentBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(sentBody.backend).toBe('vllm')
+    expect(sentBody.max_num_tokens).toBe(4096)
+    expect(sentBody.max_batch_size).toBe(128)
   })
 
   it('sends allow_hf_config_download: true in the upstream request', async () => {

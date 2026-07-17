@@ -21,7 +21,10 @@ export interface KvCacheCalcResult {
   }
   metadata: {
     modelPath: string
+    backend: string
     system: string
+    maxNumTokens: number
+    maxBatchSize: number
     source: string
     durationMs: number
   }
@@ -66,7 +69,10 @@ export async function callKvCacheCalc(
 
   const externalPayload: Record<string, unknown> = {
     model_path: request.model_path,
+    backend: request.backend,
     system: request.system,
+    max_num_tokens: request.max_num_tokens,
+    max_batch_size: request.max_batch_size,
     allow_hf_config_download: true,
     username,
     password,
@@ -144,7 +150,10 @@ export async function callKvCacheCalc(
     },
     metadata: {
       modelPath: request.model_path,
+      backend: request.backend,
       system: request.system,
+      maxNumTokens: request.max_num_tokens,
+      maxBatchSize: request.max_batch_size,
       source: typeof rawData.source === 'string' ? rawData.source : 'unknown',
       durationMs,
     },

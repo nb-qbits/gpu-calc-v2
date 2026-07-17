@@ -66,6 +66,9 @@ export type GpuSizerRequest = z.infer<typeof GpuSizerRequestSchema>
 export const KvCacheCalcRequestSchema = z.object({
   model_path: z.string().min(1, 'model_path is required'),
   system: z.string().min(1, 'system is required'),
+  backend: z.string().default('vllm'),
+  max_num_tokens: z.number().int().positive().default(4096),
+  max_batch_size: z.number().int().positive().default(128),
 }).strict()
 
 export type KvCacheCalcRequest = z.infer<typeof KvCacheCalcRequestSchema>

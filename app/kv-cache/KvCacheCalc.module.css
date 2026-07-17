@@ -146,6 +146,61 @@
   cursor: not-allowed;
 }
 
+/* ---------- advanced settings accordion ---------- */
+.advancedToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--t2);
+  cursor: pointer;
+  text-align: left;
+}
+.advancedToggle:hover { color: var(--blue); }
+.advancedToggleIcon {
+  font-size: 11px;
+  width: 12px;
+  display: inline-block;
+}
+.advancedSummary {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--t3);
+  margin-left: 8px;
+}
+.advancedRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bg3);
+}
+@media (max-width: 700px) {
+  .advancedRow { grid-template-columns: 1fr; }
+}
+.numberInput {
+  width: 100%;
+  height: 40px;
+  border: 1px solid #b8bbbe;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--t);
+  background: #ffffff;
+}
+.numberInput:focus { border-color: var(--blue); outline: none; }
+
 /* ---------- result tiles ---------- */
 .tilesGrid {
   display: grid;
@@ -384,6 +439,110 @@
 }
 .errorAlert {
   margin-bottom: 24px;
+}
+.errorAlert p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--t2);
+}
+.errorLink {
+  color: #151515;
+  font-weight: 700;
+  text-decoration: none;
+  background: #f0ab00;
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.errorLink:hover {
+  background: #c58c00;
+  color: #fff;
+}
+
+/* ---------- debug panel ---------- */
+.debugSection {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.debugToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: #a0a0a0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.debugToggle:hover { color: #d4d4d4; }
+.debugToggleIcon {
+  font-size: 11px;
+  width: 12px;
+  display: inline-block;
+}
+.debugStatusBadge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 8px;
+  margin-left: 4px;
+}
+.debugStatusOk {
+  background: rgba(62, 134, 53, 0.25);
+  color: #6ccf5e;
+}
+.debugStatusErr {
+  background: rgba(238, 0, 0, 0.2);
+  color: #ff6b6b;
+}
+.debugDuration {
+  font-size: 11.5px;
+  color: #777;
+  margin-left: auto;
+}
+.debugBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #333;
+  border-top: 1px solid #333;
+}
+@media (max-width: 800px) {
+  .debugBody { grid-template-columns: 1fr; }
+}
+.debugPane {
+  background: #1e1e1e;
+  padding: 12px 16px;
+  overflow: auto;
+}
+.debugPaneHeader {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+  margin-bottom: 8px;
+}
+.debugPre {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  max-height: 400px;
+  overflow: auto;
 }
 
 /* ---------- reduced motion ---------- */
