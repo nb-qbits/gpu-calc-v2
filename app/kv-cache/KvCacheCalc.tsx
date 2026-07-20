@@ -23,8 +23,15 @@ export default function KvCacheCalc() {
   const [model, setModel] = React.useState(MODEL_CATALOG[0]?.hfId ?? '')
   const [system, setSystem] = React.useState(GPU_OPTIONS_KV[0]?.systemId ?? '')
   const [backend, setBackend] = React.useState('vllm')
-  const [maxNumTokens, setMaxNumTokens] = React.useState(4096)
+  const [backendVersion, setBackendVersion] = React.useState('')
+  const [maxNumTokens, setMaxNumTokens] = React.useState(8192)
   const [maxBatchSize, setMaxBatchSize] = React.useState(128)
+  const [tpSize, setTpSize] = React.useState(1)
+  const [ppSize, setPpSize] = React.useState(1)
+  const [moeTpSize, setMoeTpSize] = React.useState('')
+  const [moeEpSize, setMoeEpSize] = React.useState('')
+  const [memFractionKind, setMemFractionKind] = React.useState('of_total')
+  const [memFractionValue, setMemFractionValue] = React.useState(1.0)
   const [advancedOpen, setAdvancedOpen] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
   const [result, setResult] = React.useState<KvCacheCalcResult | null>(null)
@@ -43,13 +50,22 @@ export default function KvCacheCalc() {
     setError(null)
     setResult(null)
 
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
       model_path: model,
       system,
       backend,
       max_num_tokens: maxNumTokens,
       max_batch_size: maxBatchSize,
+      tp_size: tpSize,
+      pp_size: ppSize,
+      memory_fraction_kind: memFractionKind,
+      memory_fraction_value: memFractionValue,
     }
+    if (backendVersion.trim()) requestBody.backend_version = backendVersion.trim()
+    const moeTp = parseInt(moeTpSize, 10)
+    if (!isNaN(moeTp) && moeTp > 0) requestBody.moe_tp_size = moeTp
+    const moeEp = parseInt(moeEpSize, 10)
+    if (!isNaN(moeEp) && moeEp > 0) requestBody.moe_ep_size = moeEp
     setDebugRequest(requestBody)
     setDebugResponse(null)
     setDebugStatus(null)
@@ -163,44 +179,139 @@ export default function KvCacheCalc() {
           Advanced settings
           {!advancedOpen && (
             <span className={styles.advancedSummary}>
-              backend: {backend} · max tokens: {maxNumTokens.toLocaleString()} · batch size: {maxBatchSize}
+              {backend}{backendVersion ? ` v${backendVersion}` : ''} · tokens: {maxNumTokens.toLocaleString()} · batch: {maxBatchSize} · TP {tpSize}{ppSize > 1 ? ` · PP ${ppSize}` : ''}{moeTpSize ? ` · MoE TP ${moeTpSize}` : ''}
             </span>
           )}
         </button>
         {advancedOpen && (
-          <div className={styles.advancedRow}>
-            <div className={styles.field}>
-              <label htmlFor="kv-backend" className={styles.fieldLabel}>Backend</label>
-              <select
-                id="kv-backend"
-                value={backend}
-                onChange={e => setBackend(e.target.value)}
-                className={styles.gpuSelect}
-              >
-                <option value="vllm">vLLM</option>
-              </select>
+          <div className={styles.advancedBody}>
+            {/* Serving config */}
+            <div className={styles.advancedSectionLabel}>Serving config</div>
+            <div className={styles.advancedRow4}>
+              <div className={styles.field}>
+                <label htmlFor="kv-backend" className={styles.fieldLabel}>Backend</label>
+                <select
+                  id="kv-backend"
+                  value={backend}
+                  onChange={e => setBackend(e.target.value)}
+                  className={styles.gpuSelect}
+                >
+                  <option value="vllm">vLLM</option>
+                  <option value="sglang">SGLang</option>
+                </select>
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-backend-ver" className={styles.fieldLabel}>Backend version</label>
+                <input
+                  type="text"
+                  id="kv-backend-ver"
+                  value={backendVersion}
+                  onChange={e => setBackendVersion(e.target.value)}
+                  placeholder="latest"
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-tokens" className={styles.fieldLabel}>Max num tokens</label>
+                <input
+                  type="number"
+                  id="kv-tokens"
+                  value={maxNumTokens}
+                  onChange={e => setMaxNumTokens(parseInt(e.target.value, 10) || 0)}
+                  min={1}
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-batch" className={styles.fieldLabel}>Max batch size</label>
+                <input
+                  type="number"
+                  id="kv-batch"
+                  value={maxBatchSize}
+                  onChange={e => setMaxBatchSize(parseInt(e.target.value, 10) || 0)}
+                  min={1}
+                  className={styles.numberInput}
+                />
+              </div>
             </div>
-            <div className={styles.field}>
-              <label htmlFor="kv-tokens" className={styles.fieldLabel}>Max num tokens</label>
-              <input
-                type="number"
-                id="kv-tokens"
-                value={maxNumTokens}
-                onChange={e => setMaxNumTokens(parseInt(e.target.value, 10) || 0)}
-                min={1}
-                className={styles.numberInput}
-              />
+
+            {/* Parallelism */}
+            <div className={styles.advancedSectionLabel}>Parallelism</div>
+            <div className={styles.advancedRow4}>
+              <div className={styles.field}>
+                <label htmlFor="kv-tp" className={styles.fieldLabel}>TP size</label>
+                <input
+                  type="number"
+                  id="kv-tp"
+                  value={tpSize}
+                  onChange={e => setTpSize(parseInt(e.target.value, 10) || 1)}
+                  min={1}
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-pp" className={styles.fieldLabel}>PP size</label>
+                <input
+                  type="number"
+                  id="kv-pp"
+                  value={ppSize}
+                  onChange={e => setPpSize(parseInt(e.target.value, 10) || 1)}
+                  min={1}
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-moe-tp" className={styles.fieldLabel}>MoE TP size</label>
+                <input
+                  type="text"
+                  id="kv-moe-tp"
+                  value={moeTpSize}
+                  onChange={e => setMoeTpSize(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="auto"
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-moe-ep" className={styles.fieldLabel}>MoE EP size</label>
+                <input
+                  type="text"
+                  id="kv-moe-ep"
+                  value={moeEpSize}
+                  onChange={e => setMoeEpSize(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="auto"
+                  className={styles.numberInput}
+                />
+              </div>
             </div>
-            <div className={styles.field}>
-              <label htmlFor="kv-batch" className={styles.fieldLabel}>Max batch size</label>
-              <input
-                type="number"
-                id="kv-batch"
-                value={maxBatchSize}
-                onChange={e => setMaxBatchSize(parseInt(e.target.value, 10) || 0)}
-                min={1}
-                className={styles.numberInput}
-              />
+
+            {/* Memory */}
+            <div className={styles.advancedSectionLabel}>Memory</div>
+            <div className={styles.advancedRow2}>
+              <div className={styles.field}>
+                <label htmlFor="kv-mem-val" className={styles.fieldLabel}>Memory fraction</label>
+                <input
+                  type="number"
+                  id="kv-mem-val"
+                  value={memFractionValue}
+                  onChange={e => setMemFractionValue(parseFloat(e.target.value) || 0)}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className={styles.numberInput}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="kv-mem-kind" className={styles.fieldLabel}>Fraction kind</label>
+                <select
+                  id="kv-mem-kind"
+                  value={memFractionKind}
+                  onChange={e => setMemFractionKind(e.target.value)}
+                  className={styles.gpuSelect}
+                >
+                  <option value="of_total">of_total</option>
+                  <option value="of_free">of_free</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -330,10 +441,14 @@ export default function KvCacheCalc() {
             <div className={styles.configTitle}>Request details</div>
             <div className={styles.configGrid}>
               <ConfigItem label="Model" value={result.metadata.modelPath} />
-              <ConfigItem label="Backend" value={result.metadata.backend} />
+              <ConfigItem label="Backend" value={result.metadata.backendVersion ? `${result.metadata.backend} v${result.metadata.backendVersion}` : result.metadata.backend} />
               <ConfigItem label="GPU system" value={result.metadata.system} />
               <ConfigItem label="Max tokens" value={result.metadata.maxNumTokens.toLocaleString()} />
               <ConfigItem label="Batch size" value={result.metadata.maxBatchSize.toLocaleString()} />
+              <ConfigItem label="TP / PP" value={`${result.metadata.tpSize} / ${result.metadata.ppSize}`} />
+              {result.metadata.moeTpSize != null && <ConfigItem label="MoE TP" value={String(result.metadata.moeTpSize)} />}
+              {result.metadata.moeEpSize != null && <ConfigItem label="MoE EP" value={String(result.metadata.moeEpSize)} />}
+              <ConfigItem label="Mem fraction" value={`${result.metadata.memoryFractionValue} (${result.metadata.memoryFractionKind})`} />
               <ConfigItem label="Source" value={result.metadata.source} />
               <ConfigItem label="Response time" value={`${result.metadata.durationMs}ms`} />
             </div>

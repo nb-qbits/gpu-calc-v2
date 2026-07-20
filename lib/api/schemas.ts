@@ -67,8 +67,15 @@ export const KvCacheCalcRequestSchema = z.object({
   model_path: z.string().min(1, 'model_path is required'),
   system: z.string().min(1, 'system is required'),
   backend: z.string().default('vllm'),
-  max_num_tokens: z.number().int().positive().default(4096),
+  backend_version: z.string().nullish(),
+  max_num_tokens: z.number().int().positive().default(8192),
   max_batch_size: z.number().int().positive().default(128),
+  tp_size: z.number().int().positive().default(1),
+  pp_size: z.number().int().positive().default(1),
+  moe_tp_size: z.number().int().positive().nullish(),
+  moe_ep_size: z.number().int().positive().nullish(),
+  memory_fraction_kind: z.enum(['of_total', 'of_free']).default('of_total'),
+  memory_fraction_value: z.number().min(0).max(1).default(1.0),
 }).strict()
 
 export type KvCacheCalcRequest = z.infer<typeof KvCacheCalcRequestSchema>

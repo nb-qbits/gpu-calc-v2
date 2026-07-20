@@ -22,9 +22,16 @@ export interface KvCacheCalcResult {
   metadata: {
     modelPath: string
     backend: string
+    backendVersion: string | null
     system: string
     maxNumTokens: number
     maxBatchSize: number
+    tpSize: number
+    ppSize: number
+    moeTpSize: number | null
+    moeEpSize: number | null
+    memoryFractionKind: string
+    memoryFractionValue: number
     source: string
     durationMs: number
   }
@@ -73,10 +80,17 @@ export async function callKvCacheCalc(
     system: request.system,
     max_num_tokens: request.max_num_tokens,
     max_batch_size: request.max_batch_size,
+    tp_size: request.tp_size,
+    pp_size: request.pp_size,
+    memory_fraction_kind: request.memory_fraction_kind,
+    memory_fraction_value: request.memory_fraction_value,
     allow_hf_config_download: true,
     username,
     password,
   }
+  if (request.backend_version) externalPayload.backend_version = request.backend_version
+  if (request.moe_tp_size != null) externalPayload.moe_tp_size = request.moe_tp_size
+  if (request.moe_ep_size != null) externalPayload.moe_ep_size = request.moe_ep_size
 
   let response: Response
   try {
@@ -151,9 +165,16 @@ export async function callKvCacheCalc(
     metadata: {
       modelPath: request.model_path,
       backend: request.backend,
+      backendVersion: request.backend_version ?? null,
       system: request.system,
       maxNumTokens: request.max_num_tokens,
       maxBatchSize: request.max_batch_size,
+      tpSize: request.tp_size,
+      ppSize: request.pp_size,
+      moeTpSize: request.moe_tp_size ?? null,
+      moeEpSize: request.moe_ep_size ?? null,
+      memoryFractionKind: request.memory_fraction_kind,
+      memoryFractionValue: request.memory_fraction_value,
       source: typeof rawData.source === 'string' ? rawData.source : 'unknown',
       durationMs,
     },

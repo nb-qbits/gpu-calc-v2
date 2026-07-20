@@ -176,16 +176,38 @@
   color: var(--t3);
   margin-left: 8px;
 }
-.advancedRow {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
+.advancedBody {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--bg3);
 }
-@media (max-width: 700px) {
-  .advancedRow { grid-template-columns: 1fr; }
+.advancedSectionLabel {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+.advancedSectionLabel:first-child { margin-top: 0; }
+.advancedRow4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 16px;
+}
+.advancedRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .advancedRow4 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .advancedRow4 { grid-template-columns: 1fr; }
+  .advancedRow2 { grid-template-columns: 1fr; }
 }
 .numberInput {
   width: 100%;
