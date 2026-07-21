@@ -33,6 +33,9 @@ export function getStorageBytesPerParam(
     case 'int4':
       return 0.5  // INT4: 0.5 bytes per param
 
+    case 'mxfp4':
+      return 0.5  // MXFP4 (microscaling FP4): 4 bits per param
+
     case 'gptq':
     case 'awq':
       // GPTQ/AWQ: use bits field if present, otherwise default to 4-bit
@@ -97,12 +100,31 @@ export function estimateWeightMemoryBytes(cfg: ExtractedConfig): number {
 
   // Quantized model: split params into quantized vs unquantized buckets
   const totalParams = estimateTotalParams(cfg)
+  const skipPatterns = quantConfig.modules_to_not_convert ?? []
 
-  // Estimate unquantized params (embedding + lm_head)
-  // Most quantization schemes skip embedding table and lm_head
+  // Embedding + lm_head are always unquantized
   const embeddingParams = cfg.vocab_size * cfg.hidden_size
-  const lmHeadParams = cfg.vocab_size * cfg.hidden_size  // Usually untied
-  const unquantizedParams = embeddingParams + lmHeadParams
+  const lmHeadParams = cfg.vocab_size * cfg.hidden_size
+  let unquantizedParams = embeddingParams + lmHeadParams
+
+  // If modules_to_not_convert includes attention patterns, keep attention at full precision
+  const skipsAttention = skipPatterns.some(p =>
+    p.includes('self_attn') || p.includes('attention')
+  )
+  if (skipsAttention) {
+    const attnPerLayer =
+      cfg.H_q * cfg.d * cfg.hidden_size +  // Q
+      cfg.H_kv * cfg.d * cfg.hidden_size +  // K
+      cfg.H_kv * cfg.d * cfg.hidden_size +  // V
+      cfg.H_q * cfg.d * cfg.hidden_size     // O
+    unquantizedParams += attnPerLayer * cfg.L
+  }
+
+  // If modules_to_not_convert includes router patterns (MoE gate), keep router at full precision
+  const skipsRouter = skipPatterns.some(p => p.includes('router'))
+  if (skipsRouter && cfg.is_moe && cfg.total_routed_experts != null) {
+    unquantizedParams += cfg.total_routed_experts * cfg.hidden_size * cfg.L
+  }
 
   // Remaining params are quantized
   const quantizedParams = Math.max(0, totalParams - unquantizedParams)

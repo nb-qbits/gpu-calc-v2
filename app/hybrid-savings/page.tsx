@@ -1,10 +1,11 @@
 "use client";
 import { PageSection, Title, TextContent, EmptyState, EmptyStateBody } from "@patternfly/react-core";
 import { CubesIcon } from "@patternfly/react-icons";
+import ComingSoonRibbon from "@/components/ComingSoonRibbon/ComingSoonRibbon";
 
 export default function HybridSavingsPage() {
   return (
-    <>
+    <ComingSoonRibbon>
       <PageSection variant="light">
         <TextContent>
           <Title headingLevel="h1" size="2xl">Hybrid Savings</Title>
@@ -19,6 +20,6 @@ export default function HybridSavingsPage() {
           </EmptyStateBody>
         </EmptyState>
       </PageSection>
-    </>
+    </ComingSoonRibbon>
   );
 }

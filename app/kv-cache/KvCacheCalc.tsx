@@ -320,22 +320,16 @@ export default function KvCacheCalc() {
       {/* Error */}
       {error && (
         <div className={styles.errorAlert}>
-          {error.toLowerCase().includes('unsupported') ? (
-            <Alert variant="warning" title="Model not supported by backend" isInline>
-              <p>
-                This model architecture is not currently supported for backend KV cache estimation.
-                You can try using our{' '}
-                <a href="/quick-estimate" className={styles.errorLink}>
-                  Quick Estimate calculator
-                </a>{' '}
-                for an approximate KV cache calculation instead.
-              </p>
-            </Alert>
-          ) : (
-            <Alert variant="danger" title="Calculation failed" isInline>
-              {error}
-            </Alert>
-          )}
+          <Alert variant={error.toLowerCase().includes('unsupported') ? 'warning' : 'danger'} title="Calculation failed" isInline>
+            <p>{error}</p>
+            <p style={{ marginTop: 8 }}>
+              You can also try using our{' '}
+              <a href="/quick-estimate" className={styles.errorLink}>
+                Quick Estimate calculator
+              </a>{' '}
+              for an approximate KV cache calculation.
+            </p>
+          </Alert>
         </div>
       )}
 

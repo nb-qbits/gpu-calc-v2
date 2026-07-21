@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import ComingSoonRibbon from '@/components/ComingSoonRibbon/ComingSoonRibbon'
 import styles from './cluster-cost.module.css'
 import { fetchAllProviders, getEffectiveRate, loadUserOverrides, setUserOverride, clearUserOverride, loadSelectedGpus, saveSelectedGpu, type Provider } from '@/lib/pricing/providerPricing'
 
@@ -733,6 +734,7 @@ export default function ClusterCostPage() {
   ]
 
   return (
+    <ComingSoonRibbon>
     <div className={styles.content} ref={contentRef}>
       {/* LEFT PANEL */}
       <div className={`${styles.lp} ${styles.panel}`} style={{ width: cols[0], flexShrink: 0 }}>
@@ -1524,5 +1526,6 @@ export default function ClusterCostPage() {
         {toast && <div className={styles.toast}>✓ {toast}</div>}
       </div>
     </div>
+    </ComingSoonRibbon>
   )
 }

@@ -55,7 +55,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 letterSpacing: "-0.02em",
               }}
             >
-              gpu<span style={{ color: "#ee0000" }}>calc</span>
+              Config<span style={{ color: "#ee0000" }}>IQ</span>
+            </span>
+            <span style={{
+              display: 'flex',
+              flexDirection: 'column' as const,
+              marginLeft: 16,
+              gap: 2,
+            }}>
+              <span style={{
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.7)',
+                letterSpacing: '0.01em',
+              }}>(formerly GPUCalc)</span>
+              <span style={{
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.7)',
+                letterSpacing: '0.01em',
+              }}>An internal community project — not an official Red Hat product.</span>
             </span>
           </Link>
         </MastheadBrand>

@@ -55,8 +55,8 @@ function extractQuantConfig(raw: Record<string, unknown>): QuantizationConfig {
     (qcfg.quant_method as string | undefined) ??
     'unknown'
 
-  const type = (['fp8', 'int8', 'int4', 'gptq', 'awq', 'bnb', 'none'] as const).includes(
-    rawType as 'fp8' | 'int8' | 'int4' | 'gptq' | 'awq' | 'bnb' | 'none'
+  const type = (['fp8', 'int8', 'int4', 'gptq', 'awq', 'bnb', 'mxfp4', 'none'] as const).includes(
+    rawType as 'fp8' | 'int8' | 'int4' | 'gptq' | 'awq' | 'bnb' | 'mxfp4' | 'none'
   )
     ? (rawType as QuantizationConfig['type'])
     : 'unknown'
