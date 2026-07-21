@@ -13,6 +13,7 @@ export type Vendor =
   | 'AI21'
   | 'Falcon'
   | 'Microsoft'
+  | 'OpenAI'
   | 'Other'
 
 export interface ModelSpec {
@@ -88,6 +89,11 @@ export const MODEL_CATALOG: ModelSpec[] = [
     id: 'gemma-3-27b',
     hfId: 'google/gemma-3-27b-it',
     name: 'Gemma 3 27B', vendor: 'Google', paramLabel: '27B', isNew: true,
+  },
+  {
+    id: 'gemma-4-26b',
+    hfId: 'google/gemma-4-26B-A4B-it',
+    name: 'Gemma 4 26B-A4B', vendor: 'Google', paramLabel: '26B-A4B', tags: ['MoE'], isNew: true,
   },
   {
     id: 'recurrentgemma-2b',
@@ -205,9 +211,21 @@ export const MODEL_CATALOG: ModelSpec[] = [
     name: 'Nemotron-H 56B', vendor: 'NVIDIA', paramLabel: '56B', tags: ['SSM', 'MoE'], isNew: true,
   },
   {
+    id: 'nemotron-3-super-120b',
+    hfId: 'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8',
+    name: 'Nemotron 3 Super 120B-A12B', vendor: 'NVIDIA', paramLabel: '120B-A12B', tags: ['MoE', 'FP8'], isNew: true,
+  },
+  {
     id: 'nemotron-340b',
     hfId: 'nvidia/Nemotron-4-340B-Instruct',
     name: 'Nemotron 340B', vendor: 'NVIDIA', paramLabel: '340B',
+  },
+
+  // ── OpenAI ─────────────────────────────────────────────────────────────────
+  {
+    id: 'gpt-oss-120b',
+    hfId: 'openai/gpt-oss-120b',
+    name: 'GPT OSS 120B', vendor: 'OpenAI', paramLabel: '120B', tags: ['MoE'], isNew: true,
   },
 
   // ── AI21 Jamba ─────────────────────────────────────────────────────────────

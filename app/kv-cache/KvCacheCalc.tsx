@@ -357,14 +357,14 @@ export default function KvCacheCalc() {
             <TileCard
               id="total"
               dark
-              label="Total KV cache"
+              label="Available for KV cache / GPU"
               value={formatBytes(animKv)}
               sub={`${result.kvCache.totalTokens.toLocaleString()} tokens capacity`}
               flipped={flipped.total ?? false}
               onFlip={() => toggleFlip('total')}
               backContent={
                 <>
-                  <div className={styles.backTitle}>KV cache detail</div>
+                  <div className={styles.backTitle}>KV cache / GPU detail</div>
                   <BackRow label="Raw bytes" value={result.kvCache.totalBytes.toLocaleString()} dark />
                   <BackRow label="Total tokens" value={result.kvCache.totalTokens.toLocaleString()} dark />
                   <BackRow label="Per token" value={`${result.kvCache.perTokenBytes.toLocaleString()} B`} dark />
