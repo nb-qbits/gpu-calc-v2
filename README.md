@@ -15,6 +15,7 @@ Built with Next.js + PatternFly + Red Hat design system.
 | **GPU Explorer** | Compare GPUs across memory, throughput, cost, and availability |
 | **Hybrid Savings** | Model cost savings across cloud, on-premise, and hybrid strategies |
 | **Routing Economics** | Analyze request routing between model tiers |
+| **Pricing Admin** | Admin dashboard for managing GPU and API token pricing data |
 
 ## Getting started
 
@@ -78,6 +79,21 @@ lib/
     format.ts         Number / unit formatting helpers
 docs/                 Architecture docs and ADRs
 ```
+
+## Pricing Admin
+
+The Pricing Admin dashboard (`/pricing-admin.html`) is a standalone tool for managing GPU cloud and API token pricing data sourced via a Cloudflare Worker.
+
+**Access:** Requires a Cloudflare Worker URL and an admin token to connect.
+
+**Capabilities:**
+
+- View and search all GPU cloud and API token prices across providers (AWS, GCP, Azure, Lambda, CoreWeave, RunPod, Vast.ai, etc.)
+- Filter by GPU type, confidence level (API-sourced, scraped, or manually verified), and pricing type (on-demand, reserved, spot)
+- Review and approve/reject flagged price changes before they take effect
+- Trigger manual collection runs against specific provider sources
+- View run history with fetch/update/error metrics
+- Export full pricing dataset as CSV
 
 ## Contributing
 

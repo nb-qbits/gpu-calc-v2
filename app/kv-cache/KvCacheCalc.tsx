@@ -444,7 +444,6 @@ export default function KvCacheCalc() {
               {result.metadata.moeEpSize != null && <ConfigItem label="MoE EP" value={String(result.metadata.moeEpSize)} />}
               <ConfigItem label="Mem fraction" value={`${result.metadata.memoryFractionValue} (${result.metadata.memoryFractionKind})`} />
               <ConfigItem label="Source" value={result.metadata.source} />
-              <ConfigItem label="Response time" value={`${result.metadata.durationMs}ms`} />
             </div>
           </div>
         </>
